@@ -1,0 +1,50 @@
+# Pusula Configuration Example
+# Copy to /etc/unbound-ui/config.yaml
+
+server:
+  # Port to listen on
+  port: 3000
+  
+  # Host to bind to (0.0.0.0 for all interfaces)
+  host: 0.0.0.0
+
+# Unbound configuration paths
+unbound:
+  # Main Unbound config file (for validation)
+  mainConfigPath: /etc/unbound/unbound.conf
+  
+  # Managed include file (Pusula writes here)
+  managedIncludePath: /etc/unbound/unbound-ui-managed.conf
+
+# DoH proxy configuration (for DoH mode)
+dohProxy:
+  # Proxy type: 'cloudflared' or 'dnscrypt-proxy'
+  type: cloudflared
+  
+  # Systemd service name
+  serviceName: cloudflared
+  
+  # Port the proxy listens on
+  listenPort: 5053
+
+# Rate limiting
+rateLimit:
+  login:
+    max: 5          # Max login attempts
+    windowMs: 60000 # Per minute
+  api:
+    max: 60         # Max API requests
+    windowMs: 60000 # Per minute
+
+# Brute-force lockout
+lockout:
+  threshold: 5              # Failures before lockout
+  durationMs: 900000        # 15 minutes
+  extendedThreshold: 10     # Failures before extended lockout
+  extendedDurationMs: 3600000 # 1 hour
+
+# Pi-hole integration (optional)
+pihole:
+  enabled: false
+  baseUrl: http://localhost/admin/api.php
+  apiToken: ""  # Optional, required for some endpoints

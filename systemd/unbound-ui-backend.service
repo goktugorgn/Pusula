@@ -1,0 +1,50 @@
+[Unit]
+Description=Pusula DNS Management Backend
+Documentation=https://github.com/yourusername/pusula
+After=network.target unbound.service
+Wants=unbound.service
+
+[Service]
+Type=simple
+User=unbound-ui
+Group=unbound-ui
+WorkingDirectory=/opt/pusula/backend
+
+# Environment
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/pusula/backend/.env
+
+# Run the application
+ExecStart=/usr/bin/node /opt/pusula/backend/dist/index.js
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=unbound-ui
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# Allow writes to specific directories
+ReadWritePaths=/var/lib/unbound-ui
+ReadWritePaths=/var/log/unbound-ui
+ReadWritePaths=/etc/unbound/unbound-ui-managed.conf
+
+# Allow access to unbound control
+SupplementaryGroups=unbound systemd-journal
+
+[Install]
+WantedBy=multi-user.target
