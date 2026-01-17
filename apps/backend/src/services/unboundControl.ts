@@ -31,7 +31,7 @@ export interface UnboundStats {
 export async function isUnboundRunning(): Promise<boolean> {
   try {
     const result = await safeExec('systemctl-is-active', { SERVICE: 'unbound' });
-    return result.trim() === 'active';
+    return result.stdout.trim() === 'active';
   } catch {
     return false;
   }
@@ -52,10 +52,10 @@ export async function getUnboundStatus(): Promise<UnboundStatus> {
   }
 
   try {
-    const output = await safeExec('unbound-status');
+    const result = await safeExec('unbound-status');
 
     // Parse status output
-    const lines = output.split('\n');
+    const lines = result.stdout.split('\n');
     let uptime = 0;
     let version = 'unknown';
     let pid: number | undefined;
@@ -96,8 +96,8 @@ export async function getUnboundStatus(): Promise<UnboundStatus> {
  */
 export async function getUnboundStats(): Promise<UnboundStats> {
   try {
-    const output = await safeExec('unbound-stats');
-    return parseStats(output);
+    const result = await safeExec('unbound-stats');
+    return parseStats(result.stdout);
   } catch (err) {
     throw new ServiceError('Failed to get Unbound statistics');
   }

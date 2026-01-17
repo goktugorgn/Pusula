@@ -11,48 +11,145 @@
 import { spawn } from 'node:child_process';
 import { ValidationError, CommandError } from './errors.js';
 
-// Allowed services for systemctl commands
-const ALLOWED_SERVICES = ['unbound', 'cloudflared', 'dnscrypt-proxy'] as const;
+// ============================================================================
+// ALLOWED SERVICES & UNITS
+// ============================================================================
 
-// Allowed units for journalctl
-const ALLOWED_UNITS = ['unbound', 'unbound-ui', 'cloudflared', 'dnscrypt-proxy'] as const;
+/** Allowed services for systemctl commands */
+export const ALLOWED_SERVICES = ['unbound', 'cloudflared', 'dnscrypt-proxy'] as const;
+export type AllowedService = (typeof ALLOWED_SERVICES)[number];
 
-// Parameter validation patterns
-const VALIDATORS = {
-  // DNS zone name (FQDN pattern)
-  ZONE: /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.?$/,
-  // Line count (1-9999)
+/** Allowed units for journalctl */
+export const ALLOWED_UNITS = ['unbound', 'unbound-ui', 'cloudflared', 'dnscrypt-proxy'] as const;
+export type AllowedUnit = (typeof ALLOWED_UNITS)[number];
+
+// ============================================================================
+// VALIDATION PATTERNS
+// ============================================================================
+
+/** Parameter validation patterns */
+export const VALIDATORS = {
+  /**
+   * DNS zone name (FQDN pattern)
+   * Matches: example.com, sub.example.com, example.com., .
+   */
+  ZONE: /^\.?$|^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.?$/,
+
+  /**
+   * Hostname pattern
+   * Matches: ns1.example.com, localhost, my-server
+   */
+  HOSTNAME: /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/,
+
+  /**
+   * Line count (1-9999)
+   */
   LINES: /^\d{1,4}$/,
-  // ISO timestamp
+
+  /**
+   * ISO timestamp
+   * Matches: 2026-01-17, 2026-01-17T18:00:00, 2026-01-17T18:00:00Z
+   */
   SINCE: /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$/,
-  // Safe file path (no traversal, limited directories)
+
+  /**
+   * Safe file path (limited to /etc/unbound/)
+   */
   FILE: /^\/etc\/unbound\/[a-zA-Z0-9._-]+\.conf$/,
+
+  /**
+   * DoH URL allowlist pattern (for future use)
+   * Only allows known trusted DoH endpoints
+   */
+  DOH_URL: /^https:\/\/(cloudflare-dns\.com|dns\.google|dns\.quad9\.net)(\/dns-query)?$/,
 } as const;
 
-// Command definitions
+// ============================================================================
+// COMMAND DEFINITIONS
+// ============================================================================
+
 interface CommandDef {
   cmd: string;
   args: string[];
   timeout?: number;
+  /** If true, non-zero exit codes are allowed (returns as success with code) */
+  allowNonZero?: boolean;
 }
 
 const ALLOWED_COMMANDS: Record<string, CommandDef> = {
-  // Unbound control
-  'unbound-status': { cmd: 'unbound-control', args: ['status'], timeout: 5000 },
-  'unbound-stats': { cmd: 'unbound-control', args: ['stats_noreset'], timeout: 5000 },
-  'unbound-reload': { cmd: 'unbound-control', args: ['reload'], timeout: 10000 },
-  'unbound-flush-all': { cmd: 'unbound-control', args: ['flush_zone', '.'], timeout: 5000 },
-  'unbound-flush-zone': { cmd: 'unbound-control', args: ['flush_zone', '$ZONE'], timeout: 5000 },
-  'unbound-checkconf': { cmd: 'unbound-checkconf', args: [], timeout: 10000 },
-  'unbound-checkconf-file': { cmd: 'unbound-checkconf', args: ['-f', '$FILE'], timeout: 10000 },
+  // -------------------------------------------------------------------------
+  // unbound-control commands
+  // -------------------------------------------------------------------------
+  'unbound-status': {
+    cmd: 'unbound-control',
+    args: ['status'],
+    timeout: 5000,
+  },
+  'unbound-stats': {
+    cmd: 'unbound-control',
+    args: ['stats_noreset'],
+    timeout: 5000,
+  },
+  'unbound-reload': {
+    cmd: 'unbound-control',
+    args: ['reload'],
+    timeout: 10000,
+  },
+  'unbound-flush-all': {
+    cmd: 'unbound-control',
+    args: ['flush_zone', '.'],
+    timeout: 5000,
+  },
+  'unbound-flush-zone': {
+    cmd: 'unbound-control',
+    args: ['flush_zone', '$ZONE'],
+    timeout: 5000,
+  },
+  'unbound-flush-request': {
+    cmd: 'unbound-control',
+    args: ['flush', '$HOSTNAME'],
+    timeout: 5000,
+  },
+  'unbound-checkconf': {
+    cmd: 'unbound-checkconf',
+    args: [],
+    timeout: 10000,
+  },
+  'unbound-checkconf-file': {
+    cmd: 'unbound-checkconf',
+    args: ['-f', '$FILE'],
+    timeout: 10000,
+  },
 
-  // Systemctl (restricted services)
-  'systemctl-is-active': { cmd: 'systemctl', args: ['is-active', '$SERVICE'], timeout: 5000 },
-  'systemctl-status': { cmd: 'systemctl', args: ['status', '$SERVICE', '--no-pager'], timeout: 5000 },
-  'systemctl-reload': { cmd: 'systemctl', args: ['reload', '$SERVICE'], timeout: 15000 },
-  'systemctl-restart': { cmd: 'systemctl', args: ['restart', '$SERVICE'], timeout: 30000 },
+  // -------------------------------------------------------------------------
+  // systemctl commands (restricted to allowed services)
+  // -------------------------------------------------------------------------
+  'systemctl-is-active': {
+    cmd: 'systemctl',
+    args: ['is-active', '$SERVICE'],
+    timeout: 5000,
+    allowNonZero: true, // is-active returns 3 for inactive
+  },
+  'systemctl-status': {
+    cmd: 'systemctl',
+    args: ['status', '$SERVICE', '--no-pager'],
+    timeout: 5000,
+    allowNonZero: true, // status returns non-zero for stopped services
+  },
+  'systemctl-reload': {
+    cmd: 'systemctl',
+    args: ['reload', '$SERVICE'],
+    timeout: 15000,
+  },
+  'systemctl-restart': {
+    cmd: 'systemctl',
+    args: ['restart', '$SERVICE'],
+    timeout: 30000,
+  },
 
-  // Journal reading (read-only)
+  // -------------------------------------------------------------------------
+  // journalctl commands (read-only)
+  // -------------------------------------------------------------------------
   'journalctl-read': {
     cmd: 'journalctl',
     args: ['-u', '$UNIT', '--no-pager', '-n', '$LINES', '-o', 'json'],
@@ -64,6 +161,26 @@ const ALLOWED_COMMANDS: Record<string, CommandDef> = {
     timeout: 10000,
   },
 };
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Structured result from command execution */
+export interface ExecResult {
+  /** Exit code (0 = success) */
+  code: number;
+  /** Standard output */
+  stdout: string;
+  /** Standard error */
+  stderr: string;
+  /** Execution time in milliseconds */
+  durationMs: number;
+}
+
+// ============================================================================
+// PUBLIC API
+// ============================================================================
 
 /**
  * Check if a command ID is in the allowlist
@@ -80,9 +197,31 @@ export function getAllowedCommands(): string[] {
 }
 
 /**
- * Validate a parameter value against its pattern
+ * Validate a zone name
  */
-function validateParam(name: string, value: string): void {
+export function isValidZone(zone: string): boolean {
+  return VALIDATORS.ZONE.test(zone);
+}
+
+/**
+ * Validate a hostname
+ */
+export function isValidHostname(hostname: string): boolean {
+  return VALIDATORS.HOSTNAME.test(hostname);
+}
+
+/**
+ * Validate a DoH URL
+ */
+export function isValidDohUrl(url: string): boolean {
+  return VALIDATORS.DOH_URL.test(url);
+}
+
+/**
+ * Validate a parameter value against its pattern
+ * @throws ValidationError if invalid
+ */
+export function validateParam(name: string, value: string): void {
   switch (name) {
     case 'ZONE':
       if (!VALIDATORS.ZONE.test(value)) {
@@ -90,8 +229,14 @@ function validateParam(name: string, value: string): void {
       }
       break;
 
+    case 'HOSTNAME':
+      if (!VALIDATORS.HOSTNAME.test(value)) {
+        throw new ValidationError(`Invalid hostname format: ${value}`);
+      }
+      break;
+
     case 'SERVICE':
-      if (!ALLOWED_SERVICES.includes(value as typeof ALLOWED_SERVICES[number])) {
+      if (!ALLOWED_SERVICES.includes(value as AllowedService)) {
         throw new ValidationError(
           `Service not allowed: ${value}. Allowed: ${ALLOWED_SERVICES.join(', ')}`
         );
@@ -99,7 +244,7 @@ function validateParam(name: string, value: string): void {
       break;
 
     case 'UNIT':
-      if (!ALLOWED_UNITS.includes(value as typeof ALLOWED_UNITS[number])) {
+      if (!ALLOWED_UNITS.includes(value as AllowedUnit)) {
         throw new ValidationError(
           `Unit not allowed: ${value}. Allowed: ${ALLOWED_UNITS.join(', ')}`
         );
@@ -119,13 +264,17 @@ function validateParam(name: string, value: string): void {
       break;
 
     case 'FILE':
-      // Check pattern
       if (!VALIDATORS.FILE.test(value)) {
         throw new ValidationError(`Invalid or disallowed file path: ${value}`);
       }
-      // Check for path traversal
       if (value.includes('..') || value.includes('//')) {
         throw new ValidationError('Path traversal detected');
+      }
+      break;
+
+    case 'DOH_URL':
+      if (!VALIDATORS.DOH_URL.test(value)) {
+        throw new ValidationError(`Invalid or disallowed DoH URL: ${value}`);
       }
       break;
 
@@ -139,12 +288,16 @@ function validateParam(name: string, value: string): void {
  *
  * @param commandId - ID of the command to execute
  * @param params - Optional parameters to substitute
- * @returns Promise with stdout
+ * @returns Promise with structured result { code, stdout, stderr, durationMs }
+ * @throws ValidationError if command not allowed or params invalid
+ * @throws CommandError if execution fails
  */
 export async function safeExec(
   commandId: string,
   params: Record<string, string> = {}
-): Promise<string> {
+): Promise<ExecResult> {
+  const startTime = Date.now();
+
   // Check allowlist
   const def = ALLOWED_COMMANDS[commandId];
   if (!def) {
@@ -165,7 +318,7 @@ export async function safeExec(
     return arg;
   });
 
-  // Execute using spawn (no shell!)
+  // Execute using spawn (NO SHELL!)
   return new Promise((resolve, reject) => {
     const child = spawn(def.cmd, args, {
       shell: false,
@@ -189,19 +342,37 @@ export async function safeExec(
     });
 
     child.on('close', (code) => {
-      if (code === 0) {
-        resolve(stdout);
+      const durationMs = Date.now() - startTime;
+      const exitCode = code ?? 1;
+
+      // Check if this command allows non-zero exit codes
+      if (exitCode === 0 || def.allowNonZero) {
+        resolve({
+          code: exitCode,
+          stdout,
+          stderr,
+          durationMs,
+        });
       } else {
-        // Some commands return non-zero for expected states
-        // e.g., systemctl is-active returns 3 for inactive
-        if (commandId === 'systemctl-is-active') {
-          resolve(stdout.trim());
-        } else {
-          reject(new CommandError(commandId, stderr || `Exit code: ${code}`));
-        }
+        reject(new CommandError(commandId, stderr || `Exit code: ${exitCode}`));
       }
     });
   });
+}
+
+/**
+ * Execute command and return stdout only (throws on non-zero exit)
+ * Convenience wrapper for simple use cases
+ */
+export async function safeExecStdout(
+  commandId: string,
+  params: Record<string, string> = {}
+): Promise<string> {
+  const result = await safeExec(commandId, params);
+  if (result.code !== 0 && !ALLOWED_COMMANDS[commandId]?.allowNonZero) {
+    throw new CommandError(commandId, result.stderr || `Exit code: ${result.code}`);
+  }
+  return result.stdout;
 }
 
 export default safeExec;

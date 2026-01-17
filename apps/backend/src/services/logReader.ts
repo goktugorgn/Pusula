@@ -72,20 +72,20 @@ export async function getLogs(
 ): Promise<LogEntry[]> {
   const { limit = 100, since } = options;
 
-  let output: string;
+  let result;
   if (since) {
-    output = await safeExec('journalctl-since', {
+    result = await safeExec('journalctl-since', {
       UNIT: unit,
       SINCE: since,
     });
   } else {
-    output = await safeExec('journalctl-read', {
+    result = await safeExec('journalctl-read', {
       UNIT: unit,
       LINES: String(Math.min(limit, 1000)),
     });
   }
 
-  let entries = parseJournalOutput(output);
+  let entries = parseJournalOutput(result.stdout);
 
   // Filter by level if specified
   if (options.level) {
