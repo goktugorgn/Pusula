@@ -1,0 +1,682 @@
+openapi: 3.0.3
+info:
+  title: Pusula API
+  description: |
+    REST API for Pusula DNS Management Interface.
+
+    All endpoints except `/health` require authentication via Bearer token or httpOnly cookie.
+  version: 1.0.0
+  contact:
+    name: Pusula Project
+  license:
+    name: MIT
+
+servers:
+  - url: https://localhost:3000/api
+    description: Default local server
+
+tags:
+  - name: auth
+    description: Authentication operations
+  - name: health
+    description: Health checks
+  - name: unbound
+    description: Unbound DNS management
+  - name: upstream
+    description: Upstream provider configuration
+  - name: alerts
+    description: Alert management
+  - name: pihole
+    description: Pi-hole integration
+
+paths:
+  /login:
+    post:
+      tags: [auth]
+      summary: Authenticate user
+      description: Authenticate with username and password. Returns JWT token.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: goktugorgn
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: httpOnly cookie with JWT token
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "423":
+          $ref: "#/components/responses/LockedOut"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /user/change-password:
+    post:
+      tags: [auth]
+      summary: Change password
+      description: Change the current user's password
+      operationId: changePassword
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 12
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Returns backend health status. Does not require authentication.
+      operationId: health
+      responses:
+        "200":
+          description: Backend is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: healthy
+                      uptime:
+                        type: integer
+                        description: Uptime in seconds
+                      version:
+                        type: string
+
+  /unbound/status:
+    get:
+      tags: [unbound]
+      summary: Get Unbound status
+      description: Returns current Unbound service status
+      operationId: unboundStatus
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Unbound status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/UnboundStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceError"
+
+  /unbound/stats:
+    get:
+      tags: [unbound]
+      summary: Get Unbound statistics
+      description: Returns resolver statistics (queries, cache, errors)
+      operationId: unboundStats
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Unbound statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/UnboundStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /unbound/logs:
+    get:
+      tags: [unbound]
+      summary: Get Unbound logs
+      description: Returns recent log entries with optional filtering
+      operationId: unboundLogs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [error, warn, info, debug]
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      entries:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/LogEntry"
+                      total:
+                        type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /unbound/reload:
+    post:
+      tags: [unbound]
+      summary: Reload Unbound configuration
+      description: Triggers configuration reload via unbound-control
+      operationId: unboundReload
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceError"
+
+  /unbound/restart:
+    post:
+      tags: [unbound]
+      summary: Restart Unbound service
+      description: Triggers full service restart via systemctl
+      operationId: unboundRestart
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceError"
+
+  /unbound/flush:
+    post:
+      tags: [unbound]
+      summary: Flush DNS cache
+      description: Clears all cached DNS records
+      operationId: unboundFlush
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /upstream:
+    get:
+      tags: [upstream]
+      summary: Get upstream configuration
+      description: Returns current resolver mode and upstream servers
+      operationId: getUpstream
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Upstream configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/UpstreamConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags: [upstream]
+      summary: Update upstream configuration
+      description: |
+        Updates resolver mode and/or upstream servers.
+        Follows safe apply workflow: snapshot → validate → apply → self-test → rollback on failure
+      operationId: updateUpstream
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpstreamConfig"
+      responses:
+        "200":
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      applied:
+                        type: boolean
+                      snapshotId:
+                        type: string
+                      selfTestPassed:
+                        type: boolean
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: Apply failed, rolled back
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /self-test:
+    post:
+      tags: [upstream]
+      summary: Run self-test
+      description: Executes full self-test sequence (validation, connectivity, functionality, health)
+      operationId: selfTest
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Self-test results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/SelfTestResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /alerts:
+    get:
+      tags: [alerts]
+      summary: Get active alerts
+      description: Returns list of active (unacknowledged) alerts
+      operationId: getAlerts
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      alerts:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Alert"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /alerts/ack:
+    post:
+      tags: [alerts]
+      summary: Acknowledge alert
+      description: Acknowledges an alert by ID
+      operationId: ackAlert
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alertId]
+              properties:
+                alertId:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /pihole/summary:
+    get:
+      tags: [pihole]
+      summary: Get Pi-hole summary
+      description: Returns Pi-hole statistics (read-only)
+      operationId: piholeSummary
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Pi-hole summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PiholeSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: Pi-hole not available
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: JWT token
+            expiresIn:
+              type: integer
+              description: Token expiry in seconds
+
+    UnboundStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+        uptime:
+          type: integer
+          description: Uptime in seconds
+        version:
+          type: string
+        mode:
+          type: string
+          enum: [recursive, dot, doh]
+
+    UnboundStats:
+      type: object
+      properties:
+        totalQueries:
+          type: integer
+        cacheHits:
+          type: integer
+        cacheMisses:
+          type: integer
+        cacheHitRatio:
+          type: number
+          format: float
+        servfailCount:
+          type: integer
+        nxdomainCount:
+          type: integer
+        avgResponseTime:
+          type: number
+          description: Milliseconds
+
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum: [error, warn, info, debug]
+        message:
+          type: string
+
+    UpstreamConfig:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [recursive, dot, doh]
+        upstreams:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [dot, doh]
+              address:
+                type: string
+                description: IP:port for DoT, URL for DoH
+              enabled:
+                type: boolean
+
+    SelfTestResult:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                enum:
+                  [
+                    config_validation,
+                    upstream_connectivity,
+                    resolver_functionality,
+                    health_observation,
+                  ]
+              passed:
+                type: boolean
+              duration:
+                type: integer
+                description: Milliseconds
+              error:
+                type: string
+        totalDuration:
+          type: integer
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        type:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    PiholeSummary:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [enabled, disabled]
+        totalQueries:
+          type: integer
+        blockedQueries:
+          type: integer
+        blockPercentage:
+          type: number
+          format: float
+        domainsOnBlocklist:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+  responses:
+    Success:
+      description: Operation successful
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+
+    Unauthorized:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Invalid or missing token
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid request data
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: RATE_LIMITED
+              message: Too many requests, try again later
+
+    LockedOut:
+      description: Account locked due to failed login attempts
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: LOCKED_OUT
+              message: Account locked, try again in 15 minutes
+
+    ServiceError:
+      description: Backend service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
