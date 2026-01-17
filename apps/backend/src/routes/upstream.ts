@@ -1,0 +1,133 @@
+/**
+ * Upstream Routes
+ * GET /api/upstream
+ * PUT /api/upstream
+ * POST /api/self-test
+ */
+
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { authenticate, getClientIp } from '../security/auth.js';
+import { validateBody } from '../security/validators.js';
+import { logConfigChange, logModeChange, logSelfTest } from '../security/auditLogger.js';
+import { loadUpstreamConfig, updateUpstreamRequestSchema } from '../config/index.js';
+import { applyConfig } from '../services/configManager.js';
+import { runSelfTest, runQuickTest } from '../services/selfTest.js';
+
+export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
+  // All routes require authentication
+  fastify.addHook('preHandler', authenticate);
+
+  /**
+   * GET /api/upstream
+   */
+  fastify.get('/upstream', async (_request: FastifyRequest, _reply: FastifyReply) => {
+    const config = loadUpstreamConfig();
+
+    return {
+      success: true,
+      data: {
+        mode: config.mode,
+        upstreams:
+          config.mode === 'dot'
+            ? config.dotProviders
+            : config.mode === 'doh'
+              ? config.dohProviders
+              : [],
+      },
+    };
+  });
+
+  /**
+   * PUT /api/upstream
+   */
+  fastify.put(
+    '/upstream',
+    {
+      preHandler: validateBody(updateUpstreamRequestSchema),
+    },
+    async (request: FastifyRequest, _reply: FastifyReply) => {
+      const body = request.body as {
+        mode: 'recursive' | 'dot' | 'doh';
+        dotProviders?: any[];
+        dohProviders?: any[];
+        runSelfTest?: boolean;
+      };
+
+      const ip = getClientIp(request);
+      const user = request.user.username;
+      const currentConfig = loadUpstreamConfig();
+
+      // Build new config
+      const newConfig = {
+        mode: body.mode,
+        dotProviders: body.dotProviders || currentConfig.dotProviders,
+        dohProviders: body.dohProviders || currentConfig.dohProviders,
+      };
+
+      // Log mode change if applicable
+      if (body.mode !== currentConfig.mode) {
+        logModeChange(ip, user, currentConfig.mode, body.mode, true);
+      }
+
+      try {
+        // Apply config (creates snapshot, validates, applies, reloads)
+        const { snapshotId } = await applyConfig(newConfig);
+
+        // Run self-test if requested (default: true)
+        let selfTestPassed = true;
+        if (body.runSelfTest !== false) {
+          selfTestPassed = await runQuickTest();
+
+          if (!selfTestPassed) {
+            // Self-test failed, config already rolled back by applyConfig on error
+            logConfigChange(ip, user, 'apply', { mode: body.mode, snapshotId }, false, 'Self-test failed');
+
+            return {
+              success: false,
+              error: {
+                code: 'SELF_TEST_FAILED',
+                message: 'Configuration applied but self-test failed. Rolled back.',
+              },
+            };
+          }
+        }
+
+        logConfigChange(ip, user, 'apply', { mode: body.mode, snapshotId }, true);
+
+        return {
+          success: true,
+          data: {
+            applied: true,
+            snapshotId,
+            selfTestPassed,
+          },
+        };
+      } catch (err) {
+        logConfigChange(ip, user, 'apply', { mode: body.mode }, false, String(err));
+        throw err;
+      }
+    }
+  );
+
+  /**
+   * POST /api/self-test
+   */
+  fastify.post('/self-test', async (request: FastifyRequest, _reply: FastifyReply) => {
+    const ip = getClientIp(request);
+    const user = request.user.username;
+
+    const result = await runSelfTest();
+
+    logSelfTest(ip, user, result.passed, {
+      steps: result.steps.map((s) => ({ name: s.name, passed: s.passed })),
+      totalDuration: result.totalDuration,
+    });
+
+    return {
+      success: true,
+      data: result,
+    };
+  });
+}
+
+export default upstreamRoutes;
