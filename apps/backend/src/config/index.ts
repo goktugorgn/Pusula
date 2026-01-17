@@ -25,15 +25,25 @@ let cachedUpstream: UpstreamConfig | null = null;
 export function loadConfig(): AppConfig {
   if (cachedConfig) return cachedConfig;
 
-  const configPath = process.env.CONFIG_PATH || '/etc/unbound-ui/config.yaml';
+  // Priority: env var > /etc/unbound-ui/config.yaml > local config.yaml
+  const configPaths = [
+    process.env.CONFIG_PATH,
+    '/etc/unbound-ui/config.yaml',
+    './config.yaml',
+  ].filter(Boolean) as string[];
+
   let rawConfig = {};
 
-  if (existsSync(configPath)) {
-    try {
-      const content = readFileSync(configPath, 'utf-8');
-      rawConfig = parseYaml(content) || {};
-    } catch (err) {
-      console.error(`Failed to read config from ${configPath}:`, err);
+  for (const configPath of configPaths) {
+    if (existsSync(configPath)) {
+      try {
+        const content = readFileSync(configPath, 'utf-8');
+        rawConfig = parseYaml(content) || {};
+        console.log(`Loaded config from ${configPath}`);
+        break;
+      } catch (err) {
+        console.error(`Failed to read config from ${configPath}:`, err);
+      }
     }
   }
 

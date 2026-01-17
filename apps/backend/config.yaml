@@ -1,0 +1,28 @@
+# Pusula Configuration (Development)
+# Copy to /etc/unbound-ui/config.yaml for production
+
+server:
+  port: 3000
+  host: 0.0.0.0
+
+unbound:
+  mainConfigPath: /etc/unbound/unbound.conf
+  managedIncludePath: /etc/unbound/unbound-ui-managed.conf
+
+rateLimit:
+  login:
+    max: 5
+    windowMs: 60000
+  api:
+    max: 60
+    windowMs: 60000
+
+lockout:
+  threshold: 5
+  durationMs: 900000
+  extendedThreshold: 10
+  extendedDurationMs: 3600000
+
+pihole:
+  enabled: false
+  baseUrl: http://localhost/admin/api.php
