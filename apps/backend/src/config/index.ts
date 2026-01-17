@@ -80,21 +80,28 @@ export function loadConfig(): AppConfig {
 export function loadCredentials(): Credentials {
   if (cachedCredentials) return cachedCredentials;
 
-  const credentialsPath =
-    process.env.CREDENTIALS_PATH || '/etc/unbound-ui/credentials.json';
+  // Priority: env var > /etc/unbound-ui/credentials.json > local credentials.json
+  const credentialsPaths = [
+    process.env.CREDENTIALS_PATH,
+    '/etc/unbound-ui/credentials.json',
+    './credentials.json',
+  ].filter(Boolean) as string[];
 
-  if (!existsSync(credentialsPath)) {
-    throw new Error(`Credentials file not found: ${credentialsPath}`);
+  for (const credentialsPath of credentialsPaths) {
+    if (existsSync(credentialsPath)) {
+      try {
+        const content = readFileSync(credentialsPath, 'utf-8');
+        const data = JSON.parse(content);
+        cachedCredentials = credentialsSchema.parse(data);
+        console.log(`Loaded credentials from ${credentialsPath}`);
+        return cachedCredentials;
+      } catch (err) {
+        console.error(`Failed to load credentials from ${credentialsPath}:`, err);
+      }
+    }
   }
 
-  try {
-    const content = readFileSync(credentialsPath, 'utf-8');
-    const data = JSON.parse(content);
-    cachedCredentials = credentialsSchema.parse(data);
-    return cachedCredentials;
-  } catch (err) {
-    throw new Error(`Failed to load credentials: ${err}`);
-  }
+  throw new Error('Credentials file not found');
 }
 
 /**

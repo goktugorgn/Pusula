@@ -1,5 +1,6 @@
 # Pusula Configuration (Development)
 # Copy to /etc/unbound-ui/config.yaml for production
+# For dev, credentials are in ./credentials.json (password: testpassword123)
 
 server:
   port: 3000

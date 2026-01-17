@@ -88,7 +88,32 @@ export async function buildServer() {
   // API routes under /api prefix
   await fastify.register(
     async (api) => {
-      await api.register(authRoutes);
+      // Auth routes with stricter rate limit for login
+      await api.register(async (authScope) => {
+        // Strict rate limit for login: 5/min per IP
+        await authScope.register(fastifyRateLimit, {
+          max: config.rateLimit.login.max,
+          timeWindow: config.rateLimit.login.windowMs,
+          keyGenerator: (request) => {
+            // Rate limit by IP
+            const forwarded = request.headers['x-forwarded-for'];
+            if (forwarded) {
+              const ips = typeof forwarded === 'string' ? forwarded : forwarded[0];
+              return ips.split(',')[0].trim();
+            }
+            return request.ip;
+          },
+          errorResponseBuilder: () => ({
+            success: false,
+            error: {
+              code: 'RATE_LIMITED',
+              message: 'Too many login attempts. Please try again later.',
+            },
+          }),
+        });
+        await authScope.register(authRoutes);
+      });
+
       await api.register(healthRoutes);
       await api.register(unboundRoutes);
       await api.register(upstreamRoutes);

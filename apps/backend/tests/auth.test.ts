@@ -2,17 +2,17 @@
  * Auth unit tests
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashPassword, verifyPassword } from '../src/security/auth.js';
 
 describe('auth', () => {
   describe('hashPassword', () => {
-    it('generates an Argon2id hash', async () => {
+    it('generates a bcrypt hash', async () => {
       const password = 'test-password-123';
       const hash = await hashPassword(password);
 
       expect(hash).toBeDefined();
-      expect(hash.startsWith('$argon2id$')).toBe(true);
+      expect(hash.startsWith('$2b$')).toBe(true);
     });
 
     it('generates different hashes for same password', async () => {
@@ -38,6 +38,12 @@ describe('auth', () => {
       const hash = await hashPassword('correct-password');
 
       const result = await verifyPassword('wrong-password', hash);
+
+      expect(result).toBe(false);
+    });
+
+    it('handles invalid hash gracefully', async () => {
+      const result = await verifyPassword('password', 'not-a-valid-hash');
 
       expect(result).toBe(false);
     });
