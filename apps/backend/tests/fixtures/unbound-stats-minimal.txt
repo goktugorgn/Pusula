@@ -1,0 +1,6 @@
+total.num.queries=5000
+total.num.cachehits=4000
+total.num.cachemiss=1000
+total.recursion.time.avg=0.025
+num.answer.rcode.NOERROR=4500
+num.answer.rcode.NXDOMAIN=400

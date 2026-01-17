@@ -14,15 +14,21 @@ export interface UnboundStatus {
 }
 
 export interface UnboundStats {
+  // Core metrics
   totalQueries: number;
   cacheHits: number;
   cacheMisses: number;
   cacheHitRatio: number;
+
+  // Additional metrics
+  prefetchCount: number;
+  recursiveReplies: number;
   servfailCount: number;
   nxdomainCount: number;
-  avgResponseTime: number;
-  numQueries: number;
-  numCacheMiss: number;
+  avgResponseTimeMs: number;
+
+  // Raw stats map for UI flexibility
+  rawStats: Record<string, number>;
 }
 
 /**
@@ -105,49 +111,52 @@ export async function getUnboundStats(): Promise<UnboundStats> {
 
 /**
  * Parse stats output into structured data
+ * Exported for unit testing
  */
-function parseStats(output: string): UnboundStats {
-  const stats: UnboundStats = {
-    totalQueries: 0,
-    cacheHits: 0,
-    cacheMisses: 0,
-    cacheHitRatio: 0,
-    servfailCount: 0,
-    nxdomainCount: 0,
-    avgResponseTime: 0,
-    numQueries: 0,
-    numCacheMiss: 0,
-  };
+export function parseStats(output: string): UnboundStats {
+  const rawStats: Record<string, number> = {};
 
+  // Parse all key=value pairs into rawStats
   const lines = output.split('\n');
-
   for (const line of lines) {
-    const [key, value] = line.split('=').map((s) => s.trim());
-    const numValue = parseFloat(value);
-
-    if (key === 'total.num.queries') {
-      stats.totalQueries = numValue;
-      stats.numQueries = numValue;
-    } else if (key === 'total.num.cachehits') {
-      stats.cacheHits = numValue;
-    } else if (key === 'total.num.cachemiss') {
-      stats.cacheMisses = numValue;
-      stats.numCacheMiss = numValue;
-    } else if (key === 'num.answer.rcode.SERVFAIL') {
-      stats.servfailCount = numValue;
-    } else if (key === 'num.answer.rcode.NXDOMAIN') {
-      stats.nxdomainCount = numValue;
-    } else if (key === 'total.recursion.time.avg') {
-      stats.avgResponseTime = numValue * 1000; // Convert to ms
+    const eqIndex = line.indexOf('=');
+    if (eqIndex > 0) {
+      const key = line.slice(0, eqIndex).trim();
+      const valueStr = line.slice(eqIndex + 1).trim();
+      const value = parseFloat(valueStr);
+      if (!isNaN(value)) {
+        rawStats[key] = value;
+      }
     }
   }
 
-  // Calculate hit ratio
-  if (stats.totalQueries > 0) {
-    stats.cacheHitRatio = (stats.cacheHits / stats.totalQueries) * 100;
-  }
+  // Extract specific metrics (with fallback to 0)
+  const totalQueries = rawStats['total.num.queries'] ?? 0;
+  const cacheHits = rawStats['total.num.cachehits'] ?? 0;
+  const cacheMisses = rawStats['total.num.cachemiss'] ?? 0;
+  const prefetchCount = rawStats['total.num.prefetch'] ?? 0;
+  const recursiveReplies = rawStats['total.num.recursivereplies'] ?? 0;
+  const servfailCount = rawStats['num.answer.rcode.SERVFAIL'] ?? 0;
+  const nxdomainCount = rawStats['num.answer.rcode.NXDOMAIN'] ?? 0;
+  const avgResponseTimeSec = rawStats['total.recursion.time.avg'] ?? 0;
 
-  return stats;
+  // Calculate cache hit ratio
+  const cacheHitRatio = totalQueries > 0
+    ? (cacheHits / totalQueries) * 100
+    : 0;
+
+  return {
+    totalQueries,
+    cacheHits,
+    cacheMisses,
+    cacheHitRatio,
+    prefetchCount,
+    recursiveReplies,
+    servfailCount,
+    nxdomainCount,
+    avgResponseTimeMs: avgResponseTimeSec * 1000,
+    rawStats,
+  };
 }
 
 /**
