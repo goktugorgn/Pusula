@@ -138,33 +138,46 @@ UI → Backend → [Snapshot] → [Validate] → [Apply] → [Self-Test]
 ## File Structure
 
 ```
-/opt/pusula/
-├── backend/              # Node.js application
+/opt/pusula/                       # Or: project root
+├── backend/                       # Node.js application
 │   ├── src/
+│   │   ├── index.ts               # Entry point
+│   │   ├── server.ts              # Fastify server setup
+│   │   ├── config/                # Configuration
+│   │   ├── routes/                # API route handlers
+│   │   ├── services/              # Business logic
+│   │   ├── security/              # Auth, rate limit, audit
+│   │   └── utils/                 # SafeExec, errors
+│   ├── tests/
 │   ├── package.json
 │   └── .env
-├── frontend/             # React build output
+├── frontend/                      # React build output
 │   └── dist/
-├── config/
-│   └── pusula.yaml       # Application config
-├── snapshots/            # Configuration backups
-└── logs/
-    └── audit.log
+└── ...
+
+# System paths (Raspberry Pi)
+/etc/unbound-ui/
+├── config.yaml                    # Application config
+└── credentials.json               # Password hash
+
+/var/lib/unbound-ui/
+├── upstream.json                  # Upstream configuration
+└── backups/                       # Configuration snapshots
+
+/var/log/unbound-ui/
+└── audit.log                      # Audit log
 ```
 
 ### Unbound Configuration
 
 ```
 /etc/unbound/
-├── unbound.conf          # Main config (includes below)
-├── unbound.conf.d/
-│   ├── 00-server.conf    # Base server settings
-│   ├── 10-forward.conf   # Forward mode config (managed)
-│   └── 20-local.conf     # Local overrides
+├── unbound.conf                   # Main config (includes below)
+└── unbound-ui-managed.conf        # Pusula-managed include file
 ```
 
 > [!NOTE]
-> Pusula manages files in `unbound.conf.d/`. The main `unbound.conf` includes this directory.
+> Pusula manages `unbound-ui-managed.conf`. The main `unbound.conf` includes this file.
 
 ---
 
