@@ -57,6 +57,7 @@ export async function unboundRoutes(fastify: FastifyInstance): Promise<void> {
 
   /**
    * GET /api/unbound/logs
+   * Query params: limit, level, since, cursor, follow
    */
   fastify.get(
     '/unbound/logs',
@@ -64,12 +65,20 @@ export async function unboundRoutes(fastify: FastifyInstance): Promise<void> {
       preHandler: validateQuery(logsQuerySchema),
     },
     async (request: FastifyRequest, _reply: FastifyReply) => {
-      const query = request.query as { limit?: number; level?: string; since?: string };
+      const query = request.query as {
+        limit?: number;
+        level?: 'error' | 'warn' | 'info';
+        since?: string;
+        cursor?: string;
+        follow?: boolean;
+      };
 
       const result = await getUnboundLogs({
         limit: query.limit,
         level: query.level,
         since: query.since,
+        cursor: query.cursor,
+        follow: query.follow,
       });
 
       return {

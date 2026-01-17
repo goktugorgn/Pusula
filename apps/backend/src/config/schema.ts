@@ -115,6 +115,8 @@ export const ackAlertRequestSchema = z.object({
 // Query parameter schemas
 export const logsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(100),
-  level: z.enum(['error', 'warn', 'info', 'debug']).optional(),
+  level: z.enum(['error', 'warn', 'info']).optional(),
   since: z.string().optional(),
+  cursor: z.string().optional(),
+  follow: z.coerce.boolean().default(false),
 });

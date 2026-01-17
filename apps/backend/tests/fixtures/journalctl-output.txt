@@ -1,0 +1,5 @@
+{"__REALTIME_TIMESTAMP":"1737184000123456","__CURSOR":"s=abc123","PRIORITY":"3","MESSAGE":"Error: connection refused from upstream","_SYSTEMD_UNIT":"unbound.service"}
+{"__REALTIME_TIMESTAMP":"1737184001234567","__CURSOR":"s=abc124","PRIORITY":"4","MESSAGE":"Warning: slow response from 1.1.1.1","_SYSTEMD_UNIT":"unbound.service"}
+{"__REALTIME_TIMESTAMP":"1737184002345678","__CURSOR":"s=abc125","PRIORITY":"6","MESSAGE":"query www.example.com A","_SYSTEMD_UNIT":"unbound.service"}
+{"__REALTIME_TIMESTAMP":"1737184003456789","__CURSOR":"s=abc126","PRIORITY":"6","MESSAGE":"reply www.example.com A 93.184.216.34","_SYSTEMD_UNIT":"unbound.service"}
+{"__REALTIME_TIMESTAMP":"1737184004567890","__CURSOR":"s=abc127","PRIORITY":"3","MESSAGE":"Error: SERVFAIL for badzone.invalid","_SYSTEMD_UNIT":"unbound.service"}
