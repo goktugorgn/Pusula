@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sudoers Drop-in**: Least-privilege `system/sudoers-unbound-ui` for unbound-control, systemctl, journalctl
 - **Installer Script**: `scripts/install.sh` for one-command Raspberry Pi OS installation
 - **Health Check**: `scripts/postinstall-healthcheck.sh` for installation verification
+- **Uninstall Script**: `scripts/uninstall.sh` with --purge option
 - **Config Templates**: `system/config.yaml.example`, `system/credentials.json.example`
 
 - **Frontend UI** (React + Vite + TanStack Query)
