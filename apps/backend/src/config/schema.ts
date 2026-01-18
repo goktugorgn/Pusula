@@ -12,14 +12,18 @@ export const serverConfigSchema = z.object({
 
 // Rate limit configuration
 export const rateLimitConfigSchema = z.object({
-  login: z.object({
-    max: z.number().int().positive().default(5),
-    windowMs: z.number().int().positive().default(60000),
-  }),
-  api: z.object({
-    max: z.number().int().positive().default(60),
-    windowMs: z.number().int().positive().default(60000),
-  }),
+  login: z
+    .object({
+      max: z.number().int().positive().default(5),
+      windowMs: z.number().int().positive().default(60000),
+    })
+    .default({}),
+  api: z
+    .object({
+      max: z.number().int().positive().default(60),
+      windowMs: z.number().int().positive().default(60000),
+    })
+    .default({}),
 });
 
 // Lockout configuration
@@ -97,8 +101,8 @@ export const changePasswordRequestSchema = z.object({
 });
 
 export const flushCacheRequestSchema = z.object({
-  type: z.enum(['all', 'zone']).default('all'),
-  zone: z.string().optional(),
+  type: z.enum(['zone', 'request']),
+  value: z.string().min(1, 'Value is required'),
 });
 
 export const updateUpstreamRequestSchema = z.object({

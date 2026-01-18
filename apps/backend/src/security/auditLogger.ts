@@ -181,14 +181,14 @@ export function logServiceOp(
 export function logCacheFlush(
   ip: string,
   username: string,
-  type: 'all' | 'zone',
-  zone?: string,
+  type: 'all' | 'zone' | 'request',
+  value?: string,
   success: boolean = true
 ): void {
   logAuditEvent({
     event: 'cache_flush',
     actor: { ip, user: username },
-    details: { type, zone },
+    details: { type, value },
     result: success ? 'success' : 'failure',
   });
 }

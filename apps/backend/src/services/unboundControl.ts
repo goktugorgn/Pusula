@@ -204,6 +204,17 @@ export async function flushZone(zone: string): Promise<void> {
 }
 
 /**
+ * Flush a specific hostname/request
+ */
+export async function flushRequest(hostname: string): Promise<void> {
+  try {
+    await safeExec('unbound-flush-request', { HOSTNAME: hostname });
+  } catch (err) {
+    throw new ServiceError(`Failed to flush request: ${hostname}`);
+  }
+}
+
+/**
  * Validate Unbound configuration
  */
 export async function checkConfig(filePath?: string): Promise<boolean> {
@@ -227,5 +238,6 @@ export default {
   restartUnbound,
   flushAllCache,
   flushZone,
+  flushRequest,
   checkConfig,
 };

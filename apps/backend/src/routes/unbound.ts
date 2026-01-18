@@ -20,6 +20,7 @@ import {
   restartUnbound,
   flushAllCache,
   flushZone,
+  flushRequest,
 } from '../services/unboundControl.js';
 import { getUnboundLogs } from '../services/logReader.js';
 
@@ -136,6 +137,7 @@ export async function unboundRoutes(fastify: FastifyInstance): Promise<void> {
 
   /**
    * POST /api/unbound/flush
+   * Body: { type: "zone" | "request", value: string }
    */
   fastify.post(
     '/unbound/flush',
@@ -143,24 +145,43 @@ export async function unboundRoutes(fastify: FastifyInstance): Promise<void> {
       preHandler: validateBody(flushCacheRequestSchema),
     },
     async (request: FastifyRequest, _reply: FastifyReply) => {
-      const { type, zone } = request.body as { type: 'all' | 'zone'; zone?: string };
+      const { type, value } = request.body as { type: 'zone' | 'request'; value: string };
       const ip = getClientIp(request);
       const user = request.user.username;
 
-      if (type === 'zone' && zone) {
-        await flushZone(zone);
-        logCacheFlush(ip, user, 'zone', zone);
-      } else {
-        await flushAllCache();
-        logCacheFlush(ip, user, 'all');
+      try {
+        if (type === 'zone') {
+          await flushZone(value);
+          logCacheFlush(ip, user, 'zone', value);
+          return {
+            success: true,
+            data: {
+              ok: true,
+              details: `Zone "${value}" flushed successfully`,
+            },
+          };
+        } else {
+          await flushRequest(value);
+          logCacheFlush(ip, user, 'request', value);
+          return {
+            success: true,
+            data: {
+              ok: true,
+              details: `Request "${value}" flushed successfully`,
+            },
+          };
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        logCacheFlush(ip, user, type, value, false);
+        return {
+          success: false,
+          data: {
+            ok: false,
+            details: errorMsg,
+          },
+        };
       }
-
-      return {
-        success: true,
-        data: {
-          message: type === 'zone' ? `Zone ${zone} flushed` : 'All cache flushed',
-        },
-      };
     }
   );
 }
