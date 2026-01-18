@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pi-hole Integration**: Read-only summary with graceful fallback
 - **137+ Unit Tests**: Comprehensive coverage across all modules
 
+- **Frontend UI** (React + Vite + TanStack Query)
+- **Login Page**: Fixed username, password input, lockout/rate-limit countdown
+- **Dashboard**: Live status/stats polling (3s), mini charts, quick actions
+- **Upstreams Page**: Mode selector, provider presets, priority ordering, change diff
+- **Self-Test Page**: Stepper UI, pass/warn/fail status, copy diagnostics
+- **Alerts Page**: Filter by status, acknowledge, nav badge with count
+- **Logs Page**: LogViewer with level/time filters, follow mode, search, copy
+- **Settings Page**: Change password form, server info, audit log placeholder
+- **Design System**: GlassCard, StatCard, Button, Input, Badge, Toast, ConfirmModal
+- **Auth System**: AuthContext, useAuth hook, ProtectedRoute, token storage
+
 ### Changed
 
 - Migrated password hashing from Argon2id to bcrypt for broader compatibility

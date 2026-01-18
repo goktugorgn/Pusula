@@ -34,19 +34,53 @@ Pusula follows a layered architecture with clear separation between UI, backend,
 
 ### Frontend (React)
 
-| Aspect    | Details                              |
-| --------- | ------------------------------------ |
-| Framework | React 18+                            |
-| Styling   | Tailwind CSS (Glassmorphism theme)   |
-| State     | React Query or SWR for data fetching |
-| Build     | Vite                                 |
-| Hosting   | Served by backend (static files)     |
+| Aspect    | Details                            |
+| --------- | ---------------------------------- |
+| Framework | React 18+                          |
+| Styling   | Tailwind CSS (Glassmorphism theme) |
+| State     | TanStack Query (React Query v5)    |
+| Routing   | React Router v6                    |
+| Build     | Vite                               |
+| Hosting   | Served by backend (static files)   |
+
+**UI Pages:**
+
+| Route        | Description                                           |
+| ------------ | ----------------------------------------------------- |
+| `/login`     | Fixed username login with lockout/rate-limit handling |
+| `/`          | Dashboard with live stats, mini charts, quick actions |
+| `/upstreams` | Mode selector, provider management, change diff       |
+| `/self-test` | Run tests, stepper UI, copy diagnostics               |
+| `/alerts`    | Active alerts with acknowledge, nav badge             |
+| `/logs`      | Log viewer with filters, follow mode, search          |
+| `/settings`  | Change password, server info, audit log placeholder   |
+
+**Design System Components:**
+
+| Component      | Purpose                                          |
+| -------------- | ------------------------------------------------ |
+| `GlassCard`    | Glass-effect container with variants             |
+| `StatCard`     | Metric display with icon and trend               |
+| `Button`       | Primary/secondary/danger/ghost variants          |
+| `Input`        | Text input with label and error                  |
+| `Badge`        | Status badges with dot/pulse                     |
+| `ConfirmModal` | Native dialog confirmations                      |
+| `Toast`        | Notification system (success/error/warning/info) |
+| `MiniChart`    | SVG line/area charts                             |
+| `LogViewer`    | Full log viewer with filters                     |
+
+**Authentication:**
+
+- Token stored in-memory with localStorage fallback
+- `AuthContext` + `useAuth` hook for login/logout
+- `ProtectedRoute` component for route guards
+- Auto-redirect to `/login` on 401 responses
 
 **Responsibilities:**
 
 - Render dashboard, settings, logs UI
 - Handle user authentication flow
-- Display real-time metrics (polling/WebSocket)
+- Display real-time metrics (polling)
 - Provide configuration editing UI
 
 ---
