@@ -6,7 +6,7 @@
 # One-command install for Raspberry Pi OS (Bookworm+)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/admin/pusula/main/scripts/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/goktugorgn/Pusula/refs/heads/main/scripts/install.sh | sudo bash
 #
 # Or locally:
 #   sudo ./scripts/install.sh
