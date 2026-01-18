@@ -68,6 +68,9 @@ Desktop.ini
 .cache/
 .parcel-cache/
 
+# Local DEV mode runtime data (macOS development)
+.local-dev/
+
 # -----------------------------------------------------------------------------
 # Temporary files
 # -----------------------------------------------------------------------------

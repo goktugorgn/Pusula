@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Local macOS DEV Mode (2026-01-18)**:
+  - Added "Local macOS DEV mode" section to `06-operations.md`
+  - Added "Local DEV Troubleshooting" section to `09-runbook.md`
+  - Added `src/config/mockConfig.ts` for DEV mode path resolution
+  - Added `src/utils/mockExec.ts` for mock command execution
+  - Integrated mock layer into `safeExec.ts` via `UNBOUND_UI_ENV=dev` check
+  - Created 7 mock data fixtures in `apps/backend/mock-data/`
+  - Added `.env.dev` pre-configured DEV environment
+  - Added `scripts/setup-local-dev.sh` to create `.local-dev/` structure
+  - Added `scripts/local-smoke-test.sh` for endpoint verification
+  - Updated `apps/ui/README.md` with local dev instructions
+  - Added `apps/ui/.env.example`
+  - Added `.local-dev/` to `.gitignore`
+
 - **Documentation Sync (2026-01-18)**:
   - Added `/api/logout` endpoint to API contract and OpenAPI spec
   - Added comprehensive smoke test checklist to runbook

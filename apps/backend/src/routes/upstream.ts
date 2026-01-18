@@ -114,10 +114,11 @@ export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
     const user = request.user.username;
 
     const result = await runSelfTest();
+    const passed = result.summary.status === 'pass';
 
-    logSelfTest(ip, user, result.passed, {
-      steps: result.steps.map((s) => ({ name: s.name, passed: s.passed })),
-      totalDuration: result.totalDuration,
+    logSelfTest(ip, user, passed, {
+      steps: result.steps.map((s) => ({ name: s.name, status: s.status })),
+      totalDurationMs: result.totalDurationMs,
     });
 
     return {

@@ -10,6 +10,8 @@
 
 import { spawn } from 'node:child_process';
 import { ValidationError, CommandError } from './errors.js';
+import { isDevMode } from '../config/mockConfig.js';
+import mockExec from './mockExec.js';
 
 // ============================================================================
 // ALLOWED SERVICES & UNITS
@@ -296,6 +298,11 @@ export async function safeExec(
   commandId: string,
   params: Record<string, string> = {}
 ): Promise<ExecResult> {
+  // DEV mode: use mock execution instead of real commands
+  if (isDevMode()) {
+    return mockExec(commandId, params);
+  }
+
   const startTime = Date.now();
 
   // Check allowlist

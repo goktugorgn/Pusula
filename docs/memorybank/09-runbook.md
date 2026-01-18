@@ -378,6 +378,87 @@ echo "=== Smoke Test Complete ==="
 
 ---
 
+## Local DEV Troubleshooting (macOS)
+
+### DEV Mode Not Activating
+
+```bash
+# Symptom: Backend tries to execute real commands
+# Check: Verify environment variable is set
+echo $UNBOUND_UI_ENV  # Should be "dev"
+
+# Solution: Ensure .env file is loaded
+cd apps/backend
+cat .env | grep UNBOUND_UI_ENV
+# Should show: UNBOUND_UI_ENV=dev
+
+# If using npm run dev, ensure dotenv is loading first
+```
+
+### Missing .local-dev Directory
+
+```bash
+# Symptom: "ENOENT: config.yaml not found"
+# Solution: Run setup script
+./scripts/setup-local-dev.sh
+
+# Or create manually
+mkdir -p .local-dev/etc/unbound-ui
+mkdir -p .local-dev/var/lib/unbound-ui/backups
+mkdir -p .local-dev/var/log/unbound-ui
+```
+
+### Port 3000 Already in Use
+
+```bash
+# Find what's using port 3000
+lsof -i :3000
+
+# Kill process or change port
+export PORT=3001
+npm run dev
+```
+
+### Login Failing with 401
+
+```bash
+# Symptom: Cannot login in DEV mode
+# Check credentials.json exists and has valid format
+cat .local-dev/etc/unbound-ui/credentials.json
+
+# Default dev credentials:
+# Username: admin
+# Password: admin
+
+# Regenerate if needed
+./scripts/setup-local-dev.sh --reset-credentials
+```
+
+### Mock Data Not Loading
+
+```bash
+# Check mock data fixtures exist
+ls -la apps/backend/mock-data/
+
+# Verify file contents
+cat apps/backend/mock-data/unbound-control/status.txt
+```
+
+### UI Cannot Connect to Backend
+
+```bash
+# Check backend is running
+curl http://localhost:3000/api/health
+
+# Check Vite proxy configuration (apps/ui/vite.config.ts)
+# Ensure /api proxies to localhost:3000
+
+# Alternative: set explicit API URL
+VITE_API_BASE_URL=http://localhost:3000/api npm run dev
+```
+
+---
+
 ## Related Documents
 
 - [06-operations.md](06-operations.md) – General operations

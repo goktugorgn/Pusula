@@ -1,0 +1,12 @@
+● unbound.service - Unbound DNS resolver
+     Loaded: loaded (/lib/systemd/system/unbound.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-01-17 12:00:00 UTC; 1 day ago
+       Docs: man:unbound(8)
+   Main PID: 1234 (unbound)
+      Tasks: 2 (limit: 4915)
+     Memory: 45.2M
+        CPU: 2min 34.567s
+     CGroup: /system.slice/unbound.service
+             └─1234 /usr/sbin/unbound -d -p
+
+Jan 18 10:00:00 raspberrypi unbound[1234]: info: start of service

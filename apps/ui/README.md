@@ -12,6 +12,55 @@ npm run dev
 
 Dev server at http://localhost:5173 (proxies API to :3000)
 
+---
+
+## Local Development (macOS)
+
+To run the full stack locally without Unbound/systemd:
+
+### 1. Setup Backend DEV Mode
+
+```bash
+# From repo root
+./scripts/setup-local-dev.sh
+
+cd apps/backend
+cp .env.dev .env
+npm install
+npm run dev
+```
+
+### 2. Start UI
+
+```bash
+cd apps/ui
+npm install
+npm run dev
+```
+
+### 3. Open Browser
+
+Open http://localhost:5173 and login with:
+
+- **Username**: admin
+- **Password**: admin
+
+### 4. Run Smoke Test (optional)
+
+```bash
+./scripts/local-smoke-test.sh
+```
+
+### Environment Variables
+
+Create `.env` from `.env.example` if you need custom config:
+
+| Variable            | Default | Description               |
+| ------------------- | ------- | ------------------------- |
+| `VITE_API_BASE_URL` | `/api`  | Backend API URL (proxied) |
+
+---
+
 ## Tech Stack
 
 | Technology     | Version | Purpose                 |

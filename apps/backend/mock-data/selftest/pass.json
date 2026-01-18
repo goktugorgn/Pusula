@@ -1,0 +1,54 @@
+{
+  "steps": [
+    {
+      "name": "Config Validation",
+      "status": "pass",
+      "details": {
+        "configPath": "/etc/unbound/unbound.conf",
+        "valid": true
+      },
+      "durationMs": 156
+    },
+    {
+      "name": "Upstream Connectivity",
+      "status": "pass",
+      "details": {
+        "mode": "dot",
+        "providers": [
+          { "name": "Cloudflare", "host": "1.1.1.1", "connected": true, "latencyMs": 28 },
+          { "name": "Cloudflare Secondary", "host": "1.0.0.1", "connected": true, "latencyMs": 32 }
+        ]
+      },
+      "durationMs": 234
+    },
+    {
+      "name": "Resolver Functionality",
+      "status": "pass",
+      "details": {
+        "tests": [
+          { "domain": "example.com", "type": "A", "resolved": true, "result": "93.184.216.34" },
+          { "domain": "cloudflare.com", "type": "AAAA", "resolved": true, "result": "2606:4700::6810:84e5" },
+          { "domain": "google.com", "type": "A", "resolved": true, "result": "142.250.80.46" }
+        ],
+        "successRate": 100
+      },
+      "durationMs": 456
+    },
+    {
+      "name": "Observation Window",
+      "status": "pass",
+      "details": {
+        "durationSeconds": 10,
+        "queriesObserved": 45,
+        "servfailRate": 0.02,
+        "avgResponseMs": 32.5
+      },
+      "durationMs": 10234
+    }
+  ],
+  "summary": {
+    "status": "pass",
+    "recommendations": []
+  },
+  "totalDurationMs": 11080
+}

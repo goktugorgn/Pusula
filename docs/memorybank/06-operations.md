@@ -372,6 +372,114 @@ sudo DEBUG=pusula:* node /opt/pusula/backend/src/index.js
 
 ---
 
+## Local macOS DEV Mode
+
+> [!NOTE]
+> DEV mode allows running Pusula on macOS without Unbound, systemd, or journalctl. Ideal for UI development and testing.
+
+### Prerequisites
+
+| Component | Version | Notes                  |
+| --------- | ------- | ---------------------- |
+| macOS     | 12+     | Apple Silicon or Intel |
+| Node.js   | 18+ LTS | Via nvm or Homebrew    |
+| npm       | 9+      | Included with Node.js  |
+
+### DEV Mode Environment
+
+Set `UNBOUND_UI_ENV=dev` to enable mock system layer:
+
+```bash
+# In apps/backend/.env
+UNBOUND_UI_ENV=dev
+PORT=3000
+JWT_SECRET=dev-secret-change-in-prod
+CONFIG_PATH=.local-dev/etc/unbound-ui/config.yaml
+CREDENTIALS_PATH=.local-dev/etc/unbound-ui/credentials.json
+UPSTREAM_PATH=.local-dev/var/lib/unbound-ui/upstream.json
+BACKUP_DIR=.local-dev/var/lib/unbound-ui/backups
+AUDIT_LOG_PATH=.local-dev/var/log/unbound-ui/audit.log
+ALERTS_PATH=.local-dev/var/lib/unbound-ui/alerts.json
+```
+
+### DEV Directory Structure
+
+```
+.local-dev/                        # Runtime data (gitignored)
+├── etc/unbound-ui/
+│   ├── config.yaml                # Server config
+│   └── credentials.json           # Dev credentials
+└── var/
+    ├── lib/unbound-ui/
+    │   ├── upstream.json          # Upstream config
+    │   ├── alerts.json            # Persisted alerts
+    │   └── backups/               # Config snapshots
+    └── log/unbound-ui/
+        └── audit.log              # Audit log
+
+apps/backend/mock-data/            # Static fixtures (in repo)
+├── unbound-control/
+│   ├── status.txt
+│   └── stats_noreset.txt
+├── systemctl/
+│   ├── is-active-unbound.txt
+│   └── status-unbound.txt
+├── journalctl/
+│   └── unbound.log
+└── selftest/
+    ├── pass.json
+    └── fail.json
+```
+
+### Quick Start (macOS)
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/goktugorgn/pusula.git
+cd pusula
+
+# 2. Setup local dev environment
+./scripts/setup-local-dev.sh
+
+# 3. Install dependencies
+cd apps/backend && npm install && cd ..
+cd apps/ui && npm install && cd ..
+
+# 4. Start backend (DEV mode)
+cd apps/backend
+cp .env.dev .env
+npm run dev
+
+# 5. Start UI (separate terminal)
+cd apps/ui
+npm run dev
+
+# 6. Open browser
+open http://localhost:5173
+```
+
+### DEV Mode Behavior
+
+| Endpoint                    | DEV Behavior                     |
+| --------------------------- | -------------------------------- |
+| `GET /api/unbound/status`   | Returns mock status (running)    |
+| `GET /api/unbound/stats`    | Returns parsed fixture data      |
+| `GET /api/unbound/logs`     | Returns mock log entries         |
+| `POST /api/unbound/reload`  | Logs action, returns success     |
+| `POST /api/unbound/restart` | Logs action, returns success     |
+| `POST /api/unbound/flush`   | Logs action, returns success     |
+| `PUT /api/upstream`         | Writes to `.local-dev/`, success |
+| `POST /api/self-test`       | Returns mock test results        |
+| `GET /api/pihole/summary`   | Returns `configured: false`      |
+
+### Smoke Test
+
+```bash
+./scripts/local-smoke-test.sh
+```
+
+---
+
 ## Related Documents
 
 - [09-runbook.md](09-runbook.md) – Detailed operational procedures

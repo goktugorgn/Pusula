@@ -81,7 +81,7 @@ export async function alertRoutes(fastify: FastifyInstance): Promise<void> {
 
       // Audit log
       logAuditEvent({
-        event: 'alert_acknowledged',
+        event: 'alert_ack',
         actor: { ip, user: username },
         details: { alertId, rule: alert.rule, severity: alert.severity },
         result: 'success',
