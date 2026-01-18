@@ -48,7 +48,7 @@ Pusula, **Raspberry Pi OS (Bookworm ve üzeri)** veya **Debian 12+** sistemler i
 Tek bir komutla tüm bağımlılıkları (Node.js, Unbound vb.) kurabilir ve servisi başlatabilirsiniz:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/goktugorgun/pusula/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/goktugorgn/Pusula/refs/heads/main/scripts/install.sh | sudo bash
 ```
 
 ### Kurulum Sonrası
