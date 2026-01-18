@@ -39,6 +39,8 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+.agents/
+.local-dev/
 
 # -----------------------------------------------------------------------------
 # IDE and editors
