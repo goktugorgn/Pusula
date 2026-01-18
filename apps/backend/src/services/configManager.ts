@@ -1,27 +1,31 @@
 /**
  * Configuration Manager
- * Handles safe apply workflow: snapshot → validate → apply → reload → self-test → rollback
+ * Handles safe apply workflow:
+ * 1. Snapshot current config (managed include + upstream.json)
+ * 2. Validate new config (unbound-checkconf)
+ * 3. Write new config atomically
+ * 4. Reload Unbound
+ * 5. Quick self-test
+ * 6. Rollback on any failure
  */
 
 import {
   readFileSync,
-  writeFileSync,
   copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
   rmSync,
 } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join } from 'node:path';
 import { checkConfig, reloadUnbound } from './unboundControl.js';
 import { ServiceError } from '../utils/errors.js';
 import { atomicWriteSync } from '../utils/atomicWrite.js';
+import { logConfigChange } from '../security/auditLogger.js';
 import {
   loadUpstreamConfig,
   invalidateUpstreamCache,
   type UpstreamConfig,
-  type DotProvider,
-  type DohProvider,
 } from '../config/index.js';
 
 // Max snapshots to keep
@@ -39,6 +43,20 @@ export interface Snapshot {
   upstreamConfig: UpstreamConfig;
 }
 
+export interface ApplyResult {
+  success: boolean;
+  snapshotId: string;
+  validationPassed: boolean;
+  reloadPassed: boolean;
+  selfTestPassed: boolean;
+  rolledBack: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// SNAPSHOT MANAGEMENT
+// ============================================================================
+
 /**
  * Ensure backup directory exists
  */
@@ -49,7 +67,7 @@ function ensureBackupDir(): void {
 }
 
 /**
- * Generate a snapshot ID
+ * Generate a snapshot ID (timestamp-based)
  */
 function generateSnapshotId(): string {
   return `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}`;
@@ -83,7 +101,7 @@ export async function createSnapshot(): Promise<string> {
     upstreamConfig: loadUpstreamConfig(),
   };
 
-  writeFileSync(
+  atomicWriteSync(
     join(snapshotDir, 'metadata.json'),
     JSON.stringify(metadata, null, 2)
   );
@@ -104,22 +122,24 @@ export async function rollbackToSnapshot(snapshotId: string): Promise<void> {
     throw new ServiceError(`Snapshot not found: ${snapshotId}`);
   }
 
-  // Restore managed conf
+  // Restore managed conf atomically
   const managedBackup = join(snapshotDir, 'managed.conf');
   if (existsSync(managedBackup)) {
-    copyFileSync(managedBackup, MANAGED_CONF);
+    const content = readFileSync(managedBackup, 'utf-8');
+    atomicWriteSync(MANAGED_CONF, content, 0o644);
   }
 
-  // Restore upstream config
+  // Restore upstream config atomically
   const upstreamBackup = join(snapshotDir, 'upstream.json');
   if (existsSync(upstreamBackup)) {
-    copyFileSync(upstreamBackup, UPSTREAM_PATH);
+    const content = readFileSync(upstreamBackup, 'utf-8');
+    atomicWriteSync(UPSTREAM_PATH, content, 0o644);
   }
 
   // Clear cache so next load gets fresh data
   invalidateUpstreamCache();
 
-  // Reload Unbound
+  // Reload Unbound with restored config
   await reloadUnbound();
 }
 
@@ -182,6 +202,10 @@ function cleanupOldSnapshots(): void {
   }
 }
 
+// ============================================================================
+// CONFIG GENERATION
+// ============================================================================
+
 /**
  * Generate Unbound managed config from upstream settings
  * Exported for unit testing
@@ -223,7 +247,6 @@ export function generateManagedConfig(config: UpstreamConfig): string {
     }
   } else if (config.mode === 'doh') {
     // DoH mode - forward to local proxy
-    // The proxy (cloudflared/dnscrypt-proxy) handles the actual DoH
     const localPort = config.dohProxy?.localPort || 5053;
 
     lines.push('# DoH mode - forwarding to local proxy');
@@ -237,6 +260,33 @@ export function generateManagedConfig(config: UpstreamConfig): string {
 
   return lines.join('\n') + '\n';
 }
+
+// ============================================================================
+// VALIDATION
+// ============================================================================
+
+/**
+ * Validate Unbound configuration
+ *
+ * Strategy:
+ * 1. Use unbound-checkconf (preferred, fast, reliable)
+ * 2. If checkconf unavailable, attempt reload and catch errors
+ */
+export async function validateConfig(): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const valid = await checkConfig();
+    return { valid, error: valid ? undefined : 'unbound-checkconf reported errors' };
+  } catch (err) {
+    return {
+      valid: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// ============================================================================
+// APPLY WORKFLOW
+// ============================================================================
 
 /**
  * Save upstream configuration atomically
@@ -255,7 +305,7 @@ export function saveUpstreamConfig(config: UpstreamConfig): void {
 }
 
 /**
- * Apply new configuration safely
+ * Apply new configuration safely with rollback on failure
  *
  * Workflow:
  * 1. Create snapshot of current config
@@ -264,47 +314,134 @@ export function saveUpstreamConfig(config: UpstreamConfig): void {
  * 4. Validate with unbound-checkconf
  * 5. Atomic rename to target
  * 6. Reload Unbound
- * 7. On any failure: rollback
+ * 7. Quick self-test (optional)
+ * 8. On any failure: rollback + reload
  *
- * @returns Snapshot ID and success status
+ * @param newConfig - New upstream configuration
+ * @param options - Apply options
+ * @returns ApplyResult with detailed status
  */
 export async function applyConfig(
-  newConfig: UpstreamConfig
-): Promise<{ snapshotId: string; success: boolean }> {
-  // Create snapshot before changes
-  const snapshotId = await createSnapshot();
+  newConfig: UpstreamConfig,
+  options: {
+    /** Run quick self-test after apply (default: true) */
+    runSelfTest?: boolean;
+    /** IP address of requester (for audit) */
+    actorIp?: string;
+    /** Username of requester (for audit) */
+    actorUser?: string;
+  } = {}
+): Promise<ApplyResult> {
+  const { runSelfTest = true, actorIp = 'system', actorUser = 'system' } = options;
+
+  const result: ApplyResult = {
+    success: false,
+    snapshotId: '',
+    validationPassed: false,
+    reloadPassed: false,
+    selfTestPassed: false,
+    rolledBack: false,
+  };
+
+  // Step 1: Create snapshot before changes
+  try {
+    result.snapshotId = await createSnapshot();
+  } catch (err) {
+    result.error = `Failed to create snapshot: ${err}`;
+    return result;
+  }
 
   try {
-    // Generate new managed config
+    // Step 2: Generate new managed config
     const newManagedConf = generateManagedConfig(newConfig);
 
-    // Write managed conf atomically
+    // Step 3: Write managed conf atomically
     const confResult = atomicWriteSync(MANAGED_CONF, newManagedConf, 0o644);
     if (!confResult.success) {
       throw new ServiceError(`Failed to write managed config: ${confResult.error}`);
     }
 
-    // Validate with unbound-checkconf
-    const valid = await checkConfig();
-    if (!valid) {
-      throw new ServiceError('Configuration validation failed');
+    // Step 4: Validate with unbound-checkconf
+    const validation = await validateConfig();
+    result.validationPassed = validation.valid;
+
+    if (!validation.valid) {
+      throw new ServiceError(`Validation failed: ${validation.error}`);
     }
 
-    // Write upstream config atomically
+    // Step 5: Write upstream config atomically
     saveUpstreamConfig(newConfig);
 
-    // Reload Unbound
-    await reloadUnbound();
+    // Step 6: Reload Unbound
+    try {
+      await reloadUnbound();
+      result.reloadPassed = true;
+    } catch (err) {
+      throw new ServiceError(`Reload failed: ${err}`);
+    }
 
-    return { snapshotId, success: true };
+    // Step 7: Quick self-test (optional)
+    if (runSelfTest) {
+      try {
+        // Import dynamically to avoid circular dependency
+        const { runQuickTest } = await import('./selfTest.js');
+        result.selfTestPassed = await runQuickTest();
+
+        if (!result.selfTestPassed) {
+          throw new ServiceError('Self-test failed after reload');
+        }
+      } catch (err) {
+        throw new ServiceError(`Self-test failed: ${err}`);
+      }
+    } else {
+      result.selfTestPassed = true; // Skipped
+    }
+
+    // Success!
+    result.success = true;
+
+    // Audit log success
+    logConfigChange(
+      actorIp,
+      actorUser,
+      'apply',
+      { mode: newConfig.mode, snapshotId: result.snapshotId },
+      true
+    );
+
+    return result;
   } catch (err) {
     // Rollback on any error
+    result.error = err instanceof Error ? err.message : String(err);
+
     try {
-      await rollbackToSnapshot(snapshotId);
+      await rollbackToSnapshot(result.snapshotId);
+      result.rolledBack = true;
+
+      // Audit log rollback
+      logConfigChange(
+        actorIp,
+        actorUser,
+        'rollback',
+        { snapshotId: result.snapshotId, reason: result.error },
+        true
+      );
     } catch (rollbackErr) {
-      console.error('Rollback also failed:', rollbackErr);
+      const rollbackError = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+      result.error += ` (Rollback also failed: ${rollbackError})`;
+
+      // Audit log failed rollback
+      logConfigChange(
+        actorIp,
+        actorUser,
+        'rollback',
+        { snapshotId: result.snapshotId },
+        false,
+        rollbackError
+      );
     }
-    throw err;
+
+    return result;
   }
 }
 
@@ -315,5 +452,6 @@ export default {
   listSnapshots,
   generateManagedConfig,
   saveUpstreamConfig,
+  validateConfig,
   applyConfig,
 };
