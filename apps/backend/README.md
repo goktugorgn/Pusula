@@ -153,9 +153,20 @@ npm test        # Run all tests
 npm run test:watch  # Watch mode
 ```
 
-### Test Coverage
+### Test Coverage (137+ tests)
 
-- `auth.test.ts` - Password hashing/verification
-- `lockout.test.ts` - Brute-force protection
-- `safeExec.test.ts` - Command allowlist
-- `auditLogger.test.ts` - Audit log writes
+| Test File                 | Description                             |
+| ------------------------- | --------------------------------------- |
+| `auth.test.ts`            | Password hashing, JWT verification      |
+| `lockout.test.ts`         | Brute-force protection                  |
+| `safeExec.test.ts`        | Command allowlist, parameter validation |
+| `auditLogger.test.ts`     | Audit log writes                        |
+| `configManager.test.ts`   | Config rendering, schema validation     |
+| `atomicWrite.test.ts`     | Atomic file operations                  |
+| `applyWorkflow.test.ts`   | Apply/rollback workflow                 |
+| `selfTest.test.ts`        | Diagnostic step structures              |
+| `alertStore.test.ts`      | Alert storage and thresholds            |
+| `piholeClient.test.ts`    | Pi-hole API parsing                     |
+| `logReader.test.ts`       | Log parsing and filtering               |
+| `unboundControl.test.ts`  | Stats parsing                           |
+| `actionEndpoints.test.ts` | Route validation                        |

@@ -11,22 +11,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial project structure
-- Memorybank documentation system
-- Architecture Decision Records (ADRs)
-- OpenAPI specification
+- **Backend API** (Node.js + Fastify + TypeScript)
+- **Authentication**: bcrypt password hashing, JWT sessions, secure cookies
+- **Rate Limiting**: 5/min login, 60/min API
+- **Brute-Force Protection**: IP-based lockout (15min/1hr escalation)
+- **Audit Logging**: JSON-lines to `/var/log/unbound-ui/audit.log`
+- **Secure Command Execution**: `safeExec` with strict allowlist
+- **Unbound Control Endpoints**: status, stats, logs, reload, restart, flush
+- **Upstream Configuration**: GET/PUT with DoT/DoH/recursive modes
+- **Config Renderer**: Generates `/etc/unbound/unbound-ui-managed.conf`
+- **Apply Workflow**: snapshot → validate → apply → reload → self-test → rollback
+- **Atomic File Writes**: temp + fsync + rename pattern
+- **Self-Test Endpoint**: 4-stage diagnostics with pass/warn/fail status
+- **Alerting System**: In-memory + JSON persistence, engine with thresholds
+- **Pi-hole Integration**: Read-only summary with graceful fallback
+- **137+ Unit Tests**: Comprehensive coverage across all modules
 
 ### Changed
 
-- N/A
-
-### Fixed
-
-- N/A
+- Migrated password hashing from Argon2id to bcrypt for broader compatibility
 
 ### Security
 
-- N/A
+- All endpoints require JWT authentication (except health/login)
+- Command injection prevention via allowlisted commands only
+- Parameter validation with regex patterns
 
 ---
 

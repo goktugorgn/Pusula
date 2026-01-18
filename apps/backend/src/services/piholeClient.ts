@@ -92,12 +92,13 @@ export async function getPiholeSummary(): Promise<PiholeResult> {
       throw new Error(`Pi-hole API returned ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
 
     // Parse gravity timestamp
     let gravityLastUpdated: string | null = null;
-    if (data.gravity_last_updated?.absolute) {
-      const timestamp = parseInt(data.gravity_last_updated.absolute, 10);
+    const gravityData = data.gravity_last_updated as Record<string, unknown> | undefined;
+    if (gravityData?.absolute) {
+      const timestamp = parseInt(String(gravityData.absolute), 10);
       if (!isNaN(timestamp)) {
         gravityLastUpdated = new Date(timestamp * 1000).toISOString();
       }
@@ -106,10 +107,10 @@ export async function getPiholeSummary(): Promise<PiholeResult> {
     return {
       configured: true,
       status: data.status === 'enabled' ? 'enabled' : data.status === 'disabled' ? 'disabled' : 'unknown',
-      totalQueries: parseInt(data.dns_queries_today || '0', 10),
-      blockedQueries: parseInt(data.ads_blocked_today || '0', 10),
-      percentBlocked: parseFloat(data.ads_percentage_today || '0'),
-      domainsBeingBlocked: parseInt(data.domains_being_blocked || '0', 10),
+      totalQueries: parseInt(String(data.dns_queries_today || '0'), 10),
+      blockedQueries: parseInt(String(data.ads_blocked_today || '0'), 10),
+      percentBlocked: parseFloat(String(data.ads_percentage_today || '0')),
+      domainsBeingBlocked: parseInt(String(data.domains_being_blocked || '0'), 10),
       gravityLastUpdated,
     };
   } catch (err) {
