@@ -28,7 +28,7 @@ This document indexes all Architecture Decision Records (ADRs) for the Pusula pr
 ### Authentication Model (ADR-0002)
 
 - Single-user model suitable for homelab
-- Password hashing with Argon2
+- Password hashing with bcrypt (12 rounds)
 - Rate limiting and lockout for brute-force protection
 
 ### Configuration Management (ADR-0003)

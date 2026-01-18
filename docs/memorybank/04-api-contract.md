@@ -42,6 +42,7 @@ Default: `https://192.168.1.x:3000/api`
 | Method | Endpoint                | Description                    |
 | ------ | ----------------------- | ------------------------------ |
 | `POST` | `/login`                | Authenticate and receive token |
+| `POST` | `/logout`               | Clear auth cookie              |
 | `POST` | `/user/change-password` | Change current user password   |
 
 ### Health & Status

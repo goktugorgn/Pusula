@@ -181,13 +181,16 @@ Rotation: Daily, 30 days retention.
 
 ## Transport Security
 
-### HTTPS
+### HTTPS (Optional)
 
 | Aspect      | Details                                             |
 | ----------- | --------------------------------------------------- |
-| Required    | Yes (HTTP redirects to HTTPS)                       |
-| Certificate | Self-signed (generated on install) or user-provided |
-| TLS version | 1.2+ only                                           |
+| Default     | HTTP (HTTPS optional via reverse proxy or config)   |
+| Certificate | Self-signed or user-provided (if enabling HTTPS)    |
+| Recommended | Use reverse proxy (nginx/Caddy) for TLS termination |
+
+> [!TIP]
+> For production deployments, place Pusula behind a reverse proxy with HTTPS enabled.
 
 ### Cookie Security
 
