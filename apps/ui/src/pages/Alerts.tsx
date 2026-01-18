@@ -1,139 +1,269 @@
 /**
- * Alerts Page - View and acknowledge alerts
+ * Alerts Page
+ * 
+ * - Poll alerts every 15s
+ * - Show active/acknowledged alerts
+ * - Acknowledge with confirmation
  */
 
-import { useAlerts, useAckAlert } from '../api';
-import type { Alert } from '../api';
+import { useState, useMemo, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getApi, postApi } from '../api/client';
+import type { Alert, AlertSeverity, AlertStatus } from '../api/types';
+import { GlassCard, Button, Badge, useToast } from '../components/ui';
 
-function AlertItem({ alert, onAck }: { alert: Alert; onAck: () => void }) {
-  const severityColors = {
-    critical: 'border-red-500 bg-red-500/10',
-    warning: 'border-yellow-500 bg-yellow-500/10',
-    info: 'border-blue-500 bg-blue-500/10',
-  };
+// ============================================================================
+// Types
+// ============================================================================
 
-  const severityIcons = {
-    critical: '🚨',
-    warning: '⚠️',
-    info: 'ℹ️',
-  };
+interface AlertsResponse {
+  alerts: Alert[];
+  activeCount: number;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const severityConfig: Record<AlertSeverity, { icon: string; color: string; bg: string }> = {
+  critical: { icon: '🔴', color: 'text-red-400', bg: 'bg-red-500/20' },
+  warning: { icon: '🟡', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  info: { icon: '🔵', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+};
+
+const statusConfig: Record<AlertStatus, { label: string; color: string }> = {
+  active: { label: 'Active', color: 'danger' },
+  acknowledged: { label: 'Acknowledged', color: 'warning' },
+  resolved: { label: 'Resolved', color: 'success' },
+};
+
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+// ============================================================================
+// Alert Card Component
+// ============================================================================
+
+interface AlertCardProps {
+  alert: Alert;
+  onAcknowledge: () => void;
+  acknowledging: boolean;
+}
+
+function AlertCard({ alert, onAcknowledge, acknowledging }: AlertCardProps) {
+  const config = severityConfig[alert.severity];
+  const status = statusConfig[alert.status];
+  const isActive = alert.status === 'active';
 
   return (
-    <div
-      className={`glass p-4 border-l-4 ${severityColors[alert.severity]}`}
+    <GlassCard 
+      padding="lg" 
+      borderColor={isActive ? (alert.severity === 'critical' ? 'danger' : 'warning') : 'none'}
+      className={!isActive ? 'opacity-60' : ''}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex gap-3">
-          <span className="text-2xl">{severityIcons[alert.severity]}</span>
-          <div>
-            <h3 className="text-white font-semibold">{alert.title}</h3>
-            <p className="text-white/70 text-sm">{alert.message}</p>
-            <p className="text-white/50 text-xs mt-1">
-              {new Date(alert.createdAt).toLocaleString()}
-            </p>
-          </div>
+      <div className="flex items-start gap-4">
+        {/* Icon */}
+        <div className={`text-2xl p-2 rounded-lg ${config.bg}`}>
+          {config.icon}
         </div>
-        {alert.status === 'active' && (
-          <button
-            onClick={onAck}
-            className="text-white/70 hover:text-white text-sm px-3 py-1 rounded bg-white/10 hover:bg-white/20 transition-colors"
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className={`font-semibold ${config.color}`}>{alert.title}</h3>
+            <Badge size="sm" variant={status.color as 'danger' | 'warning' | 'success' | 'default'}>
+              {status.label}
+            </Badge>
+            <Badge size="sm" variant="default">
+              {alert.rule}
+            </Badge>
+          </div>
+
+          <p className="text-white/70 text-sm mb-3">{alert.message}</p>
+
+          {/* Timestamps */}
+          <div className="flex flex-wrap gap-4 text-xs text-white/50">
+            <span>Created: {formatTime(alert.createdAt)}</span>
+            <span>Updated: {formatTime(alert.updatedAt)}</span>
+            {alert.acknowledgedAt && (
+              <span>
+                Acked: {formatTime(alert.acknowledgedAt)}
+                {alert.acknowledgedBy && ` by ${alert.acknowledgedBy}`}
+              </span>
+            )}
+          </div>
+
+          {/* Details */}
+          {alert.details && Object.keys(alert.details).length > 0 && (
+            <div className="mt-3 p-2 bg-black/20 rounded-lg">
+              <pre className="text-xs text-white/60 font-mono">
+                {JSON.stringify(alert.details, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        {isActive && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onAcknowledge}
+            loading={acknowledging}
           >
             Acknowledge
-          </button>
-        )}
-        {alert.status === 'acknowledged' && (
-          <span className="text-green-400/70 text-sm">
-            ✓ Acked by {alert.acknowledgedBy}
-          </span>
+          </Button>
         )}
       </div>
-    </div>
+    </GlassCard>
   );
 }
 
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export default function AlertsPage() {
-  const { data, isLoading } = useAlerts();
-  const ackAlert = useAckAlert();
+  const queryClient = useQueryClient();
+  const { addToast } = useToast();
+  const [filter, setFilter] = useState<'all' | 'active' | 'acknowledged' | 'resolved'>('all');
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
 
-  const handleAck = (alertId: string) => {
-    ackAlert.mutate(alertId);
-  };
+  // Poll alerts
+  const { data, isLoading } = useQuery({
+    queryKey: ['alerts'],
+    queryFn: () => getApi<AlertsResponse>('/alerts'),
+    refetchInterval: 15000,
+    staleTime: 10000,
+  });
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-white mb-6">Alerts</h1>
-        <div className="glass p-6 animate-pulse">
-          <div className="h-6 bg-white/20 rounded w-1/3"></div>
-        </div>
-      </div>
-    );
-  }
+  // Acknowledge mutation
+  const ackMutation = useMutation({
+    mutationFn: (alertId: string) => postApi<{ message: string }>('/alerts/ack', { alertId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      addToast('success', 'Alert acknowledged');
+      setAcknowledgingId(null);
+    },
+    onError: () => {
+      addToast('error', 'Failed to acknowledge alert');
+      setAcknowledgingId(null);
+    },
+  });
 
-  const alerts = data?.alerts || [];
-  const activeAlerts = alerts.filter((a) => a.status === 'active');
-  const resolvedAlerts = alerts.filter((a) => a.status !== 'active');
+  // Handle acknowledge
+  const handleAcknowledge = useCallback((alertId: string) => {
+    setAcknowledgingId(alertId);
+    ackMutation.mutate(alertId);
+  }, [ackMutation]);
+
+  // Filter alerts
+  const filteredAlerts = useMemo(() => {
+    if (!data?.alerts) return [];
+    if (filter === 'all') return data.alerts;
+    return data.alerts.filter((a) => a.status === filter);
+  }, [data?.alerts, filter]);
+
+  // Count by status
+  const counts = useMemo(() => {
+    if (!data?.alerts) return { active: 0, acknowledged: 0, resolved: 0 };
+    return {
+      active: data.alerts.filter((a) => a.status === 'active').length,
+      acknowledged: data.alerts.filter((a) => a.status === 'acknowledged').length,
+      resolved: data.alerts.filter((a) => a.status === 'resolved').length,
+    };
+  }, [data?.alerts]);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Alerts</h1>
-        <div className="flex items-center gap-2">
-          <span
-            className={`px-3 py-1 rounded-full text-sm ${
-              activeAlerts.length > 0
-                ? 'bg-yellow-500/20 text-yellow-400'
-                : 'bg-green-500/20 text-green-400'
-            }`}
-          >
-            {activeAlerts.length} active
-          </span>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Alerts</h1>
+          <p className="text-white/60 text-sm">Monitor system alerts and notifications</p>
         </div>
+        {counts.active > 0 && (
+          <Badge variant="danger" dot pulse>
+            {counts.active} Active Alert{counts.active !== 1 ? 's' : ''}
+          </Badge>
+        )}
       </div>
 
-      {alerts.length === 0 ? (
-        <div className="glass p-8 text-center">
-          <div className="text-5xl mb-4">✅</div>
-          <h2 className="text-xl font-semibold text-white mb-2">All Clear</h2>
-          <p className="text-white/70">No alerts at this time.</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Active Alerts */}
-          {activeAlerts.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Active ({activeAlerts.length})
-              </h2>
-              <div className="space-y-3">
-                {activeAlerts.map((alert) => (
-                  <AlertItem
-                    key={alert.id}
-                    alert={alert}
-                    onAck={() => handleAck(alert.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+      {/* Filters */}
+      <div className="flex gap-2">
+        {(['all', 'active', 'acknowledged', 'resolved'] as const).map((f) => {
+          const count = f === 'all' 
+            ? (data?.alerts?.length || 0)
+            : counts[f];
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`
+                px-4 py-2 rounded-xl text-sm font-medium transition-colors
+                ${filter === f 
+                  ? 'bg-indigo-500 text-white' 
+                  : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }
+              `}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+              <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded text-xs">
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-          {/* Resolved Alerts */}
-          {resolvedAlerts.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold text-white/70 mb-4">
-                History ({resolvedAlerts.length})
-              </h2>
-              <div className="space-y-3 opacity-60">
-                {resolvedAlerts.slice(0, 10).map((alert) => (
-                  <AlertItem
-                    key={alert.id}
-                    alert={alert}
-                    onAck={() => {}}
-                  />
-                ))}
-              </div>
+      {/* Alert List */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-white/10 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : filteredAlerts.length === 0 ? (
+        <GlassCard padding="lg">
+          <div className="text-center py-12">
+            <div className="text-4xl mb-4">
+              {filter === 'active' ? '✅' : '📭'}
             </div>
-          )}
+            <h3 className="text-lg font-semibold text-white mb-2">
+              {filter === 'active' ? 'No Active Alerts' : 'No Alerts'}
+            </h3>
+            <p className="text-white/60">
+              {filter === 'active' 
+                ? 'All systems are operating normally.' 
+                : 'No alerts match the current filter.'
+              }
+            </p>
+          </div>
+        </GlassCard>
+      ) : (
+        <div className="space-y-4">
+          {filteredAlerts.map((alert) => (
+            <AlertCard
+              key={alert.id}
+              alert={alert}
+              onAcknowledge={() => handleAcknowledge(alert.id)}
+              acknowledging={acknowledgingId === alert.id}
+            />
+          ))}
         </div>
       )}
     </div>

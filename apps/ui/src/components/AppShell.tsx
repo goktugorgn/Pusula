@@ -1,20 +1,32 @@
 /**
- * App Shell Layout - with auth integration
+ * App Shell Layout - with auth integration and alert badge
  */
 
 import { Outlet, NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../api/auth';
+import { getApi } from '../api/client';
 import { Badge } from './ui';
 
 export default function AppShell() {
   const { user, logout } = useAuth();
+
+  // Poll alerts for badge count
+  const { data: alertsData } = useQuery({
+    queryKey: ['alerts'],
+    queryFn: () => getApi<{ alerts: unknown[]; activeCount: number }>('/alerts'),
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+
+  const activeAlerts = alertsData?.activeCount || 0;
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
     { path: '/upstreams', label: 'Upstreams', icon: '🌐' },
     { path: '/self-test', label: 'Self-Test', icon: '🔍' },
     { path: '/logs', label: 'Logs', icon: '📋' },
-    { path: '/alerts', label: 'Alerts', icon: '🔔' },
+    { path: '/alerts', label: 'Alerts', icon: '🔔', badge: activeAlerts },
     { path: '/settings', label: 'Settings', icon: '⚙️' },
   ];
 
@@ -35,7 +47,7 @@ export default function AppShell() {
         </div>
 
         <nav className="flex-1 space-y-1">
-          {navItems.map(({ path, label, icon }) => (
+          {navItems.map(({ path, label, icon, badge }) => (
             <NavLink
               key={path}
               to={path}
@@ -49,7 +61,12 @@ export default function AppShell() {
               }
             >
               <span className="text-lg">{icon}</span>
-              <span className="font-medium">{label}</span>
+              <span className="font-medium flex-1">{label}</span>
+              {badge !== undefined && badge > 0 && (
+                <Badge size="sm" variant="danger" dot pulse>
+                  {badge}
+                </Badge>
+              )}
             </NavLink>
           ))}
           
