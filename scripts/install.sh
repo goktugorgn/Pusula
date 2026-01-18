@@ -1,405 +1,428 @@
-#!/usr/bin/env bash
-#
+#!/bin/bash
+# =============================================================================
 # Pusula Installer
-# One-command installer for Raspberry Pi OS
+# =============================================================================
 #
-# Usage: sudo ./scripts/install.sh
+# One-command install for Raspberry Pi OS (Bookworm+)
 #
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/scripts/install.sh | sudo bash
+#
+# Or locally:
+#   sudo ./scripts/install.sh
+#
+# =============================================================================
+
 set -euo pipefail
 
-# Colors
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+PUSULA_VERSION="${PUSULA_VERSION:-main}"
+INSTALL_DIR="/opt/pusula"
+CONFIG_DIR="/etc/unbound-ui"
+DATA_DIR="/var/lib/unbound-ui"
+LOG_DIR="/var/log/unbound-ui"
+SERVICE_USER="unbound-ui"
+BACKEND_PORT="${PUSULA_PORT:-3000}"
+
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
-INSTALL_DIR="/opt/pusula"
-CONFIG_DIR="/etc/unbound-ui"
-DATA_DIR="/var/lib/unbound-ui"
-LOG_DIR="/var/log/unbound-ui"
-SERVICE_USER="unbound-ui"
-NODE_VERSION="20"
+# -----------------------------------------------------------------------------
+# Helper Functions
+# -----------------------------------------------------------------------------
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
 
-# Print functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_success() {
+    echo -e "${GREEN}[OK]${NC} $1"
+}
 
-# Check root
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+    exit 1
+}
+
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        log_error "This script must be run as root (use sudo)"
-        exit 1
+        log_error "This script must be run as root. Use: sudo $0"
     fi
 }
 
-# Check OS
 check_os() {
     if [[ ! -f /etc/os-release ]]; then
-        log_error "Cannot detect OS. This script is for Raspberry Pi OS."
-        exit 1
+        log_error "Cannot detect OS. /etc/os-release not found."
     fi
     
     source /etc/os-release
-    if [[ "$ID" != "raspbian" && "$ID" != "debian" ]]; then
-        log_warn "This script is designed for Raspberry Pi OS / Debian."
-        log_warn "Detected: $PRETTY_NAME"
-    fi
-}
-
-# Install Node.js via NodeSource
-install_nodejs() {
-    log_info "Installing Node.js ${NODE_VERSION}.x..."
     
-    if command -v node &> /dev/null; then
-        local current_version
-        current_version=$(node --version | cut -d 'v' -f 2 | cut -d '.' -f 1)
-        if [[ "$current_version" -ge "${NODE_VERSION}" ]]; then
-            log_success "Node.js $(node --version) already installed"
-            return 0
-        fi
+    if [[ "$ID" != "raspbian" && "$ID" != "debian" && "$ID" != "ubuntu" ]]; then
+        log_warn "Detected OS: $ID. This script is tested on Raspberry Pi OS / Debian."
     fi
     
-    # Install NodeSource repo
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-    apt-get install -y nodejs
-    
-    log_success "Node.js $(node --version) installed"
+    log_info "Detected OS: $PRETTY_NAME"
 }
 
-# Install system dependencies
+# -----------------------------------------------------------------------------
+# Step 1: Install Dependencies
+# -----------------------------------------------------------------------------
 install_dependencies() {
-    log_info "Installing dependencies..."
-    apt-get update
-    apt-get install -y \
-        unbound \
-        unbound-anchor \
-        curl \
-        jq \
-        openssl
+    log_info "Installing system dependencies..."
     
-    # Ensure unbound-control is enabled
-    if [[ ! -f /etc/unbound/unbound_control.key ]]; then
-        log_info "Setting up unbound-control..."
-        unbound-control-setup
+    apt-get update -qq
+    
+    # Essential packages
+    apt-get install -y -qq \
+        curl \
+        gnupg \
+        ca-certificates \
+        unbound \
+        unbound-host \
+        || log_error "Failed to install essential packages"
+    
+    # Install Node.js via NodeSource (LTS)
+    if ! command -v node &> /dev/null; then
+        log_info "Installing Node.js LTS..."
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+        apt-get install -y -qq nodejs
+    else
+        NODE_VERSION=$(node --version)
+        log_info "Node.js already installed: $NODE_VERSION"
+    fi
+    
+    # Verify Node.js version
+    NODE_MAJOR=$(node --version | cut -d'.' -f1 | tr -d 'v')
+    if [[ $NODE_MAJOR -lt 18 ]]; then
+        log_error "Node.js 18+ required. Found: $(node --version)"
     fi
     
     log_success "Dependencies installed"
 }
 
-# Create service user
+# -----------------------------------------------------------------------------
+# Step 2: Create System User
+# -----------------------------------------------------------------------------
 create_user() {
-    log_info "Creating service user ${SERVICE_USER}..."
+    log_info "Creating system user: $SERVICE_USER"
     
     if id "$SERVICE_USER" &>/dev/null; then
-        log_success "User ${SERVICE_USER} already exists"
+        log_info "User $SERVICE_USER already exists"
     else
         useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
-        log_success "User ${SERVICE_USER} created"
+        log_success "Created user: $SERVICE_USER"
     fi
     
-    # Add to unbound group for unbound-control access
+    # Add to required groups
     usermod -aG unbound "$SERVICE_USER" 2>/dev/null || true
-    
-    # Add to systemd-journal for log reading
-    usermod -aG systemd-journal "$SERVICE_USER" 2>/dev/null || true
+    usermod -aG adm "$SERVICE_USER" 2>/dev/null || true
 }
 
-# Create directories
+# -----------------------------------------------------------------------------
+# Step 3: Create Directories
+# -----------------------------------------------------------------------------
 create_directories() {
     log_info "Creating directories..."
     
-    mkdir -p "$INSTALL_DIR"
+    # Config directory
     mkdir -p "$CONFIG_DIR"
-    mkdir -p "$DATA_DIR/backups"
-    mkdir -p "$LOG_DIR"
-    
-    # Set ownership
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
-    
-    # Secure config directory
-    chown root:$SERVICE_USER "$CONFIG_DIR"
     chmod 750 "$CONFIG_DIR"
+    chown root:"$SERVICE_USER" "$CONFIG_DIR"
+    
+    # Data directory
+    mkdir -p "$DATA_DIR/backups"
+    chmod 750 "$DATA_DIR"
+    chown -R "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR"
+    
+    # Log directory
+    mkdir -p "$LOG_DIR"
+    chmod 750 "$LOG_DIR"
+    chown "$SERVICE_USER":adm "$LOG_DIR"
+    
+    # Install directory
+    mkdir -p "$INSTALL_DIR"
     
     log_success "Directories created"
 }
 
-# Copy application files
-copy_application() {
-    log_info "Copying application files..."
+# -----------------------------------------------------------------------------
+# Step 4: Install Config Templates
+# -----------------------------------------------------------------------------
+install_config() {
+    log_info "Installing configuration..."
     
-    # Get script directory (repo root)
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    
-    # Copy backend
-    cp -r "$script_dir/backend" "$INSTALL_DIR/"
-    
-    # Build frontend if dist doesn't exist
-    if [[ -d "$script_dir/ui/dist" ]]; then
-        cp -r "$script_dir/ui/dist" "$INSTALL_DIR/frontend/"
-    else
-        log_warn "UI not built. Run 'npm run build' in ui/ first."
-    fi
-    
-    # Install backend dependencies
-    cd "$INSTALL_DIR/backend"
-    npm ci --omit=dev
-    npm run build
-    
-    # Set ownership
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
-    
-    log_success "Application files copied"
-}
-
-# Create configuration files
-create_config() {
-    log_info "Creating configuration files..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
     
     # Config file
     if [[ ! -f "$CONFIG_DIR/config.yaml" ]]; then
-        cat > "$CONFIG_DIR/config.yaml" << 'EOF'
-# Pusula Configuration
+        if [[ -f "$REPO_DIR/system/config.yaml.example" ]]; then
+            cp "$REPO_DIR/system/config.yaml.example" "$CONFIG_DIR/config.yaml"
+        else
+            # Create minimal config
+            cat > "$CONFIG_DIR/config.yaml" << 'EOF'
 server:
+  host: "0.0.0.0"
   port: 3000
-  host: 0.0.0.0
 
 unbound:
-  managedIncludePath: /etc/unbound/unbound-ui-managed.conf
-
-rateLimit:
-  login:
-    max: 5
-    windowMs: 60000
-  api:
-    max: 60
-    windowMs: 60000
-
-lockout:
-  threshold: 5
-  durationMs: 900000
-  extendedThreshold: 10
-  extendedDurationMs: 3600000
+  managedConfigPath: /etc/unbound/unbound-ui-managed.conf
 
 pihole:
   enabled: false
-  baseUrl: http://localhost/admin/api.php
+  baseUrl: "http://localhost"
+  apiToken: ""
+
+alerts:
+  enabled: true
+  checkInterval: 60
+
+backup:
+  maxSnapshots: 10
+  path: /var/lib/unbound-ui/backups
+
+logging:
+  level: info
+  auditPath: /var/log/unbound-ui/audit.log
 EOF
+        fi
         chmod 640 "$CONFIG_DIR/config.yaml"
-        chown root:$SERVICE_USER "$CONFIG_DIR/config.yaml"
+        chown root:"$SERVICE_USER" "$CONFIG_DIR/config.yaml"
         log_success "Created config.yaml"
     else
-        log_warn "config.yaml already exists, skipping"
+        log_info "config.yaml already exists, skipping"
     fi
-    
-    # Generate JWT secret
-    local jwt_secret
-    jwt_secret=$(openssl rand -base64 32)
-    
-    # Create .env file
-    cat > "$INSTALL_DIR/backend/.env" << EOF
-NODE_ENV=production
-JWT_SECRET=${jwt_secret}
-CONFIG_PATH=${CONFIG_DIR}/config.yaml
-CREDENTIALS_PATH=${CONFIG_DIR}/credentials.json
-UPSTREAM_PATH=${DATA_DIR}/upstream.json
-BACKUP_DIR=${DATA_DIR}/backups
-AUDIT_LOG_PATH=${LOG_DIR}/audit.log
-EOF
-    chmod 600 "$INSTALL_DIR/backend/.env"
-    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/backend/.env"
     
     # Credentials file
     if [[ ! -f "$CONFIG_DIR/credentials.json" ]]; then
-        local random_password
-        random_password=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 16)
-        local password_hash
-        password_hash=$(node -e "const bcrypt=require('bcrypt');bcrypt.hash('${random_password}',12).then(console.log)" 2>/dev/null || echo "")
+        # Generate random password (16 chars)
+        INITIAL_PASSWORD=$(tr -dc 'A-Za-z0-9!@#$%' < /dev/urandom | head -c 16)
         
-        if [[ -z "$password_hash" ]]; then
-            # Fallback - install bcrypt temporarily
-            cd "$INSTALL_DIR/backend"
-            npm install bcrypt --save 2>/dev/null || true
-            password_hash=$(node -e "const bcrypt=require('bcrypt');bcrypt.hash('${random_password}',12).then(console.log)")
+        # Generate bcrypt hash using node
+        PASSWORD_HASH=$(node -e "
+            const bcrypt = require('bcrypt');
+            console.log(bcrypt.hashSync('$INITIAL_PASSWORD', 12));
+        " 2>/dev/null || echo "")
+        
+        if [[ -z "$PASSWORD_HASH" ]]; then
+            # Fallback: generate hash after backend is installed
+            log_warn "Will generate password hash after backend installation"
+            GENERATE_PASSWORD_LATER=1
+        else
+            cat > "$CONFIG_DIR/credentials.json" << EOF
+{
+  "username": "goktugorgn",
+  "passwordHash": "$PASSWORD_HASH"
+}
+EOF
+            chmod 600 "$CONFIG_DIR/credentials.json"
+            chown "$SERVICE_USER":"$SERVICE_USER" "$CONFIG_DIR/credentials.json"
+            log_success "Created credentials.json"
         fi
+    else
+        log_info "credentials.json already exists, skipping"
+        INITIAL_PASSWORD=""
+    fi
+    
+    # Environment file
+    if [[ ! -f "$CONFIG_DIR/unbound-ui.env" ]]; then
+        # Generate JWT secret
+        JWT_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64)
         
+        cat > "$CONFIG_DIR/unbound-ui.env" << EOF
+# Pusula Environment Variables
+NODE_ENV=production
+JWT_SECRET=$JWT_SECRET
+CONFIG_PATH=$CONFIG_DIR/config.yaml
+CREDENTIALS_PATH=$CONFIG_DIR/credentials.json
+EOF
+        chmod 640 "$CONFIG_DIR/unbound-ui.env"
+        chown root:"$SERVICE_USER" "$CONFIG_DIR/unbound-ui.env"
+        log_success "Created unbound-ui.env"
+    else
+        log_info "unbound-ui.env already exists, skipping"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Step 5: Build and Install Backend + UI
+# -----------------------------------------------------------------------------
+install_application() {
+    log_info "Installing Pusula application..."
+    
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
+    
+    # Copy backend
+    log_info "Installing backend..."
+    cp -r "$REPO_DIR/apps/backend" "$INSTALL_DIR/"
+    cd "$INSTALL_DIR/backend"
+    npm ci --production --silent 2>/dev/null || npm install --production --silent
+    npm run build --silent 2>/dev/null || true
+    
+    # Copy UI (pre-built or build)
+    log_info "Installing UI..."
+    if [[ -d "$REPO_DIR/apps/ui/dist" ]]; then
+        cp -r "$REPO_DIR/apps/ui/dist" "$INSTALL_DIR/ui"
+    else
+        cp -r "$REPO_DIR/apps/ui" "$INSTALL_DIR/"
+        cd "$INSTALL_DIR/ui"
+        npm ci --silent 2>/dev/null || npm install --silent
+        npm run build --silent
+        # Keep only dist
+        mv dist ../ui-dist
+        cd ..
+        rm -rf ui
+        mv ui-dist ui
+    fi
+    
+    # Set permissions
+    chown -R root:root "$INSTALL_DIR"
+    chmod -R 755 "$INSTALL_DIR"
+    
+    # Generate password if needed
+    if [[ "${GENERATE_PASSWORD_LATER:-0}" == "1" ]]; then
+        cd "$INSTALL_DIR/backend"
+        INITIAL_PASSWORD=$(tr -dc 'A-Za-z0-9!@#$%' < /dev/urandom | head -c 16)
+        PASSWORD_HASH=$(node -e "
+            const bcrypt = require('bcrypt');
+            console.log(bcrypt.hashSync('$INITIAL_PASSWORD', 12));
+        ")
         cat > "$CONFIG_DIR/credentials.json" << EOF
 {
   "username": "goktugorgn",
-  "passwordHash": "${password_hash}"
+  "passwordHash": "$PASSWORD_HASH"
 }
 EOF
         chmod 600 "$CONFIG_DIR/credentials.json"
-        chown root:$SERVICE_USER "$CONFIG_DIR/credentials.json"
-        
-        # Save password for display at end
-        echo "$random_password" > /tmp/pusula_initial_password
-        log_success "Created credentials with random password"
-    else
-        log_warn "credentials.json already exists, skipping"
+        chown "$SERVICE_USER":"$SERVICE_USER" "$CONFIG_DIR/credentials.json"
+        log_success "Created credentials.json"
     fi
     
-    # Upstream config
-    if [[ ! -f "$DATA_DIR/upstream.json" ]]; then
-        cat > "$DATA_DIR/upstream.json" << 'EOF'
-{
-  "mode": "recursive",
-  "dotProviders": [],
-  "dohProviders": []
-}
-EOF
-        chown "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR/upstream.json"
-        log_success "Created upstream.json"
-    fi
-    
-    # Unbound managed config
-    if [[ ! -f /etc/unbound/unbound-ui-managed.conf ]]; then
-        cat > /etc/unbound/unbound-ui-managed.conf << 'EOF'
-# Pusula managed configuration
-# DO NOT EDIT MANUALLY - changes will be overwritten
-
-# Mode: Recursive (direct root resolution)
-EOF
-        chown root:unbound /etc/unbound/unbound-ui-managed.conf
-        chmod 644 /etc/unbound/unbound-ui-managed.conf
-        log_success "Created unbound-ui-managed.conf"
-    fi
-    
-    # Add include to unbound.conf if not present
-    if ! grep -q "unbound-ui-managed.conf" /etc/unbound/unbound.conf 2>/dev/null; then
-        echo -e "\n# Pusula managed include\ninclude: /etc/unbound/unbound-ui-managed.conf" >> /etc/unbound/unbound.conf
-        log_success "Added include to unbound.conf"
-    fi
+    log_success "Application installed"
 }
 
-# Install systemd services
-install_services() {
-    log_info "Installing systemd services..."
+# -----------------------------------------------------------------------------
+# Step 6: Install Systemd Units
+# -----------------------------------------------------------------------------
+install_systemd() {
+    log_info "Installing systemd units..."
     
-    # Get script directory (repo root)
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
     
     # Copy service files
-    cp "$script_dir/systemd/unbound-ui-backend.service" /etc/systemd/system/
+    cp "$REPO_DIR/systemd/unbound-ui-backend.service" /etc/systemd/system/
+    cp "$REPO_DIR/systemd/unbound-ui-doh-proxy.service" /etc/systemd/system/
     
     # Reload systemd
     systemctl daemon-reload
     
-    # Enable and start backend service
+    # Enable and start backend
     systemctl enable unbound-ui-backend
     systemctl start unbound-ui-backend
     
-    log_success "Services installed and started"
+    log_success "Systemd units installed and started"
 }
 
-# Setup permissions for unbound-control
-setup_permissions() {
-    log_info "Setting up permissions..."
+# -----------------------------------------------------------------------------
+# Step 7: Install Sudoers
+# -----------------------------------------------------------------------------
+install_sudoers() {
+    log_info "Installing sudoers configuration..."
     
-    # Allow service user to read unbound control socket
-    if [[ -f /etc/unbound/unbound_control.key ]]; then
-        chgrp unbound /etc/unbound/unbound_control.key
-        chmod 640 /etc/unbound/unbound_control.key
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
+    
+    cp "$REPO_DIR/system/sudoers-unbound-ui" /etc/sudoers.d/unbound-ui
+    chmod 440 /etc/sudoers.d/unbound-ui
+    
+    # Validate
+    if visudo -c -f /etc/sudoers.d/unbound-ui &>/dev/null; then
+        log_success "Sudoers configuration installed and validated"
+    else
+        log_error "Sudoers validation failed! Check /etc/sudoers.d/unbound-ui"
     fi
-    
-    if [[ -f /etc/unbound/unbound_control.pem ]]; then
-        chgrp unbound /etc/unbound/unbound_control.pem
-        chmod 640 /etc/unbound/unbound_control.pem
-    fi
-    
-    # Ensure unbound is running
-    systemctl enable unbound
-    systemctl restart unbound
-    
-    log_success "Permissions configured"
 }
 
-# Run health check
-run_healthcheck() {
+# -----------------------------------------------------------------------------
+# Step 8: Post-Install Health Check
+# -----------------------------------------------------------------------------
+health_check() {
     log_info "Running health check..."
     
     # Wait for service to start
     sleep 3
     
-    local health_url="http://localhost:3000/api/health"
-    local max_attempts=5
-    local attempt=1
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        if curl -sf "$health_url" > /dev/null 2>&1; then
-            log_success "Health check passed!"
-            return 0
-        fi
-        log_warn "Attempt $attempt failed, retrying..."
-        sleep 2
-        ((attempt++))
-    done
-    
-    log_error "Health check failed after $max_attempts attempts"
-    log_warn "Check logs: journalctl -u unbound-ui-backend -f"
-    return 1
-}
-
-# Print summary
-print_summary() {
-    local ip_address
-    ip_address=$(hostname -I | awk '{print $1}')
-    
-    echo ""
-    echo "========================================"
-    echo -e "${GREEN}Pusula installed successfully!${NC}"
-    echo "========================================"
-    echo ""
-    echo -e "Access URL: ${BLUE}http://${ip_address}:3000${NC}"
-    echo ""
-    
-    if [[ -f /tmp/pusula_initial_password ]]; then
-        local password
-        password=$(cat /tmp/pusula_initial_password)
-        echo -e "Initial credentials:"
-        echo -e "  Username: ${BLUE}goktugorgn${NC}"
-        echo -e "  Password: ${YELLOW}${password}${NC}"
-        echo ""
-        echo -e "${RED}⚠ Save this password! It will not be shown again.${NC}"
-        rm -f /tmp/pusula_initial_password
+    # Check service status
+    if systemctl is-active --quiet unbound-ui-backend; then
+        log_success "Service is running"
+    else
+        log_warn "Service may not be running. Check: journalctl -u unbound-ui-backend"
     fi
     
-    echo ""
-    echo "Useful commands:"
-    echo "  View logs:     journalctl -u unbound-ui-backend -f"
-    echo "  Restart:       systemctl restart unbound-ui-backend"
-    echo "  Status:        systemctl status unbound-ui-backend"
-    echo ""
+    # Check health endpoint
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:$BACKEND_PORT/api/health" | grep -q "200"; then
+        log_success "Health check passed"
+    else
+        log_warn "Health check failed. Service may still be starting..."
+    fi
 }
 
-# Main
+# -----------------------------------------------------------------------------
+# Main Installation
+# -----------------------------------------------------------------------------
 main() {
     echo ""
-    echo "========================================"
-    echo "  Pusula Installer"
-    echo "  Unbound DNS Management for Raspberry Pi"
-    echo "========================================"
+    echo "=========================================="
+    echo "  Pusula DNS Management Installer"
+    echo "=========================================="
     echo ""
     
     check_root
     check_os
+    
     install_dependencies
-    install_nodejs
     create_user
     create_directories
-    copy_application
-    create_config
-    setup_permissions
-    install_services
-    run_healthcheck || true
-    print_summary
+    install_config
+    install_application
+    install_systemd
+    install_sudoers
+    health_check
+    
+    # Get local IP
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    
+    echo ""
+    echo "=========================================="
+    echo -e "  ${GREEN}Installation Complete!${NC}"
+    echo "=========================================="
+    echo ""
+    echo "  Access Pusula at:"
+    echo -e "    ${BLUE}http://$LOCAL_IP:$BACKEND_PORT${NC}"
+    echo ""
+    if [[ -n "${INITIAL_PASSWORD:-}" ]]; then
+        echo -e "  ${YELLOW}Initial Credentials:${NC}"
+        echo "    Username: goktugorgn"
+        echo -e "    Password: ${RED}$INITIAL_PASSWORD${NC}"
+        echo ""
+        echo -e "  ${YELLOW}⚠️  IMPORTANT: Save this password! It won't be shown again.${NC}"
+    fi
+    echo ""
+    echo "  Useful commands:"
+    echo "    sudo systemctl status unbound-ui-backend"
+    echo "    sudo journalctl -u unbound-ui-backend -f"
+    echo ""
 }
 
 main "$@"

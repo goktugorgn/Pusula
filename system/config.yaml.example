@@ -1,50 +1,106 @@
-# Pusula Configuration Example
-# Copy to /etc/unbound-ui/config.yaml
+# =============================================================================
+# Pusula Server Configuration
+# =============================================================================
+# 
+# Location: /etc/unbound-ui/config.yaml
+# 
+# This file configures the Pusula backend server.
+# Restart the service after changes: sudo systemctl restart unbound-ui-backend
+#
+# =============================================================================
 
+# -----------------------------------------------------------------------------
+# Server Settings
+# -----------------------------------------------------------------------------
 server:
-  # Port to listen on
+  # Bind address (0.0.0.0 for all interfaces, 127.0.0.1 for localhost only)
+  host: "0.0.0.0"
+  
+  # HTTP port for the web interface
   port: 3000
   
-  # Host to bind to (0.0.0.0 for all interfaces)
-  host: 0.0.0.0
+  # Enable HTTPS (requires cert/key files)
+  # https:
+  #   enabled: false
+  #   cert: /etc/unbound-ui/ssl/cert.pem
+  #   key: /etc/unbound-ui/ssl/key.pem
 
-# Unbound configuration paths
+# -----------------------------------------------------------------------------
+# Authentication
+# -----------------------------------------------------------------------------
+auth:
+  # JWT token expiration (in seconds, default: 24 hours)
+  tokenExpiry: 86400
+  
+  # Session cookie settings
+  cookie:
+    secure: false  # Set to true if using HTTPS
+    sameSite: strict
+
+# -----------------------------------------------------------------------------
+# Unbound DNS Configuration
+# -----------------------------------------------------------------------------
 unbound:
-  # Main Unbound config file (for validation)
-  mainConfigPath: /etc/unbound/unbound.conf
+  # Path to managed config file (written by Pusula)
+  managedConfigPath: /etc/unbound/unbound-ui-managed.conf
   
-  # Managed include file (Pusula writes here)
-  managedIncludePath: /etc/unbound/unbound-ui-managed.conf
-
-# DoH proxy configuration (for DoH mode)
-dohProxy:
-  # Proxy type: 'cloudflared' or 'dnscrypt-proxy'
-  type: cloudflared
+  # Path to unbound-control socket (if non-default)
+  # controlSocket: /var/run/unbound/unbound.sock
   
-  # Systemd service name
-  serviceName: cloudflared
-  
-  # Port the proxy listens on
-  listenPort: 5053
+  # Log file path (for reading logs)
+  # logPath: /var/log/unbound/unbound.log
 
-# Rate limiting
-rateLimit:
-  login:
-    max: 5          # Max login attempts
-    windowMs: 60000 # Per minute
-  api:
-    max: 60         # Max API requests
-    windowMs: 60000 # Per minute
-
-# Brute-force lockout
-lockout:
-  threshold: 5              # Failures before lockout
-  durationMs: 900000        # 15 minutes
-  extendedThreshold: 10     # Failures before extended lockout
-  extendedDurationMs: 3600000 # 1 hour
-
-# Pi-hole integration (optional)
+# -----------------------------------------------------------------------------
+# Pi-hole Integration (Optional)
+# -----------------------------------------------------------------------------
 pihole:
+  # Enable Pi-hole integration
   enabled: false
-  baseUrl: http://localhost/admin/api.php
-  apiToken: ""  # Optional, required for some endpoints
+  
+  # Pi-hole web interface URL
+  baseUrl: "http://localhost"
+  
+  # Pi-hole API token (from Pi-hole Settings -> API)
+  # Leave empty for read-only access without token
+  apiToken: ""
+
+# -----------------------------------------------------------------------------
+# Alerting
+# -----------------------------------------------------------------------------
+alerts:
+  # Enable automatic alerting
+  enabled: true
+  
+  # Check interval in seconds
+  checkInterval: 60
+  
+  # Thresholds
+  thresholds:
+    # SERVFAIL rate (percentage)
+    servfailRate: 5.0
+    
+    # Cache hit ratio minimum (percentage)
+    cacheHitRatio: 50.0
+    
+    # Unbound down alert
+    unboundDown: true
+
+# -----------------------------------------------------------------------------
+# Backup Configuration
+# -----------------------------------------------------------------------------
+backup:
+  # Maximum number of snapshots to retain
+  maxSnapshots: 10
+  
+  # Backup directory
+  path: /var/lib/unbound-ui/backups
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+  
+  # Audit log path
+  auditPath: /var/log/unbound-ui/audit.log

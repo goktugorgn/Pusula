@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `unbound-ui-backend.service` with security hardening
   - `unbound-ui-doh-proxy.service` (optional, disabled by default)
 - **Sudoers Drop-in**: Least-privilege `system/sudoers-unbound-ui` for unbound-control, systemctl, journalctl
+- **Installer Script**: `scripts/install.sh` for one-command Raspberry Pi OS installation
+- **Health Check**: `scripts/postinstall-healthcheck.sh` for installation verification
+- **Config Templates**: `system/config.yaml.example`, `system/credentials.json.example`
 
 - **Frontend UI** (React + Vite + TanStack Query)
 - **Login Page**: Fixed username, password input, lockout/rate-limit countdown

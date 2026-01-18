@@ -1,14 +1,20 @@
-#!/usr/bin/env bash
-#
+#!/bin/bash
+# =============================================================================
 # Pusula Post-Install Health Check
+# =============================================================================
 #
-# Usage: ./scripts/postinstall-healthcheck.sh
+# Verifies the installation is working correctly.
 #
+# Usage:
+#   sudo ./scripts/postinstall-healthcheck.sh
+#
+# =============================================================================
+
 set -euo pipefail
 
-PORT="${PORT:-3000}"
-HOST="${HOST:-localhost}"
-BASE_URL="http://${HOST}:${PORT}/api"
+# Configuration
+BACKEND_PORT="${PUSULA_PORT:-3000}"
+SERVICE_NAME="unbound-ui-backend"
 
 # Colors
 RED='\033[0;31m'
@@ -16,76 +22,107 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo "========================================"
-echo "  Pusula Health Check"
-echo "========================================"
+ERRORS=0
+
+check() {
+    local name="$1"
+    local result="$2"
+    
+    if [[ "$result" == "ok" ]]; then
+        echo -e "${GREEN}✓${NC} $name"
+    else
+        echo -e "${RED}✗${NC} $name: $result"
+        ((ERRORS++))
+    fi
+}
+
+echo ""
+echo "Pusula Health Check"
+echo "==================="
 echo ""
 
-# Check backend service
-echo -n "Backend service status: "
-if systemctl is-active --quiet unbound-ui-backend; then
-    echo -e "${GREEN}running${NC}"
+# Check 1: Service running
+if systemctl is-active --quiet "$SERVICE_NAME"; then
+    check "Systemd service" "ok"
 else
-    echo -e "${RED}not running${NC}"
-    echo "  Run: sudo systemctl start unbound-ui-backend"
+    check "Systemd service" "not running"
 fi
 
-# Check Unbound service
-echo -n "Unbound service status: "
+# Check 2: Port listening
+if ss -tlnp | grep -q ":$BACKEND_PORT"; then
+    check "Port $BACKEND_PORT" "ok"
+else
+    check "Port $BACKEND_PORT" "not listening"
+fi
+
+# Check 3: Health endpoint
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$BACKEND_PORT/api/health" 2>/dev/null || echo "000")
+if [[ "$HTTP_CODE" == "200" ]]; then
+    check "Health endpoint" "ok"
+else
+    check "Health endpoint" "HTTP $HTTP_CODE"
+fi
+
+# Check 4: Unbound running
 if systemctl is-active --quiet unbound; then
-    echo -e "${GREEN}running${NC}"
+    check "Unbound service" "ok"
 else
-    echo -e "${RED}not running${NC}"
-    echo "  Run: sudo systemctl start unbound"
+    check "Unbound service" "not running"
 fi
 
-# Check API health endpoint
-echo -n "API health check: "
-if response=$(curl -sf "${BASE_URL}/health" 2>/dev/null); then
-    status=$(echo "$response" | jq -r '.data.status // "unknown"')
-    version=$(echo "$response" | jq -r '.data.version // "unknown"')
-    echo -e "${GREEN}OK${NC} (status: $status, version: $version)"
+# Check 5: Unbound control
+if sudo -n unbound-control status &>/dev/null; then
+    check "Unbound control access" "ok"
 else
-    echo -e "${RED}FAILED${NC}"
-    echo "  Cannot reach ${BASE_URL}/health"
+    check "Unbound control access" "permission denied"
 fi
 
-# Check unbound-control
-echo -n "unbound-control access: "
-if sudo -u unbound-ui unbound-control status &>/dev/null; then
-    echo -e "${GREEN}OK${NC}"
+# Check 6: Config files
+if [[ -f /etc/unbound-ui/config.yaml ]]; then
+    check "Config file" "ok"
 else
-    echo -e "${YELLOW}WARNING${NC}"
-    echo "  Service user may not have access to unbound-control"
+    check "Config file" "missing"
 fi
 
-# Check configuration files
-echo ""
-echo "Configuration files:"
-for file in /etc/unbound-ui/config.yaml /etc/unbound-ui/credentials.json /var/lib/unbound-ui/upstream.json; do
-    echo -n "  $file: "
-    if [[ -f "$file" ]]; then
-        echo -e "${GREEN}exists${NC}"
+if [[ -f /etc/unbound-ui/credentials.json ]]; then
+    check "Credentials file" "ok"
+else
+    check "Credentials file" "missing"
+fi
+
+# Check 7: Directories
+if [[ -d /var/lib/unbound-ui/backups ]]; then
+    check "Data directory" "ok"
+else
+    check "Data directory" "missing"
+fi
+
+if [[ -d /var/log/unbound-ui ]]; then
+    check "Log directory" "ok"
+else
+    check "Log directory" "missing"
+fi
+
+# Check 8: Sudoers
+if [[ -f /etc/sudoers.d/unbound-ui ]]; then
+    if visudo -c -f /etc/sudoers.d/unbound-ui &>/dev/null; then
+        check "Sudoers config" "ok"
     else
-        echo -e "${RED}missing${NC}"
+        check "Sudoers config" "invalid syntax"
     fi
-done
+else
+    check "Sudoers config" "missing"
+fi
 
-# Check directories
 echo ""
-echo "Directories:"
-for dir in /opt/pusula /var/lib/unbound-ui/backups /var/log/unbound-ui; do
-    echo -n "  $dir: "
-    if [[ -d "$dir" ]]; then
-        echo -e "${GREEN}exists${NC}"
-    else
-        echo -e "${RED}missing${NC}"
-    fi
-done
-
-# Print access info
-echo ""
-echo "========================================"
-ip_address=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
-echo -e "Access URL: ${GREEN}http://${ip_address}:${PORT}${NC}"
-echo "========================================"
+if [[ $ERRORS -eq 0 ]]; then
+    echo -e "${GREEN}All checks passed!${NC}"
+    echo ""
+    LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+    echo "Access Pusula at: http://$LOCAL_IP:$BACKEND_PORT"
+    exit 0
+else
+    echo -e "${YELLOW}$ERRORS check(s) failed.${NC}"
+    echo "Review the output above and check logs: journalctl -u $SERVICE_NAME"
+    exit 1
+fi
