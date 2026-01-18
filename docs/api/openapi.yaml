@@ -100,6 +100,16 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /logout:
+    post:
+      tags: [auth]
+      summary: Logout
+      description: Clear authentication cookie and end session
+      operationId: logout
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
   /health:
     get:
       tags: [health]
