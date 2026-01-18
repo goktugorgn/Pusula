@@ -1,6 +1,6 @@
 # Pusula 🧭
 
-![License](https://img.shields.io/github/license/goktugorgun/pusula?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20OS%20%7C%20Debian-blue?style=flat-square)
 ![Node.js](https://img.shields.io/badge/node.js-18%2B-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-active-success?style=flat-square)
