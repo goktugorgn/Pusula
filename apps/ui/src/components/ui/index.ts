@@ -25,3 +25,9 @@ export type { Toast, ToastType } from './Toast';
 
 export { Skeleton, SkeletonCard, SkeletonText, SkeletonAvatar } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';
+
+export { MiniChart } from './MiniChart';
+export type { MiniChartProps } from './MiniChart';
+
+export { FlushModal } from './FlushModal';
+export type { FlushModalProps } from './FlushModal';
