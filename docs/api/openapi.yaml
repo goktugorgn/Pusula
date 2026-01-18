@@ -535,8 +535,6 @@ components:
     SelfTestResult:
       type: object
       properties:
-        passed:
-          type: boolean
         steps:
           type: array
           items:
@@ -549,16 +547,29 @@ components:
                     config_validation,
                     upstream_connectivity,
                     resolver_functionality,
-                    health_observation,
+                    observation_window,
                   ]
-              passed:
-                type: boolean
-              duration:
+              status:
+                type: string
+                enum: [pass, warn, fail]
+              details:
+                type: object
+              durationMs:
                 type: integer
                 description: Milliseconds
               error:
                 type: string
-        totalDuration:
+        summary:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [pass, warn, fail]
+            recommendations:
+              type: array
+              items:
+                type: string
+        totalDurationMs:
           type: integer
 
     Alert:
@@ -566,32 +577,64 @@ components:
       properties:
         id:
           type: string
+        rule:
+          type: string
+          enum:
+            [
+              unbound_down,
+              upstream_error,
+              high_servfail_rate,
+              low_cache_hit_ratio,
+              config_validation_failed,
+            ]
         severity:
           type: string
           enum: [critical, warning, info]
-        type:
+        status:
+          type: string
+          enum: [active, acknowledged, resolved]
+        title:
           type: string
         message:
           type: string
-        timestamp:
+        details:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        acknowledgedBy:
+          type: string
+        acknowledgedAt:
           type: string
           format: date-time
 
     PiholeSummary:
       type: object
       properties:
+        configured:
+          type: boolean
         status:
           type: string
-          enum: [enabled, disabled]
+          enum: [enabled, disabled, unknown]
         totalQueries:
           type: integer
         blockedQueries:
           type: integer
-        blockPercentage:
+        percentBlocked:
           type: number
           format: float
-        domainsOnBlocklist:
+        domainsBeingBlocked:
           type: integer
+        gravityLastUpdated:
+          type: string
+          format: date-time
+          nullable: true
+        guidance:
+          type: string
+          description: Only present when configured=false
 
     ErrorResponse:
       type: object

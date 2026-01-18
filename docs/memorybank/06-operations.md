@@ -80,46 +80,35 @@ sudo journalctl -u pusula -f
 ### Main Configuration File
 
 ```yaml
-# /opt/pusula/config/pusula.yaml
+# /etc/unbound-ui/config.yaml
 server:
-  host: "0.0.0.0" # Bind address
-  port: 3000 # Listen port
-  https:
-    enabled: true
-    cert: "/opt/pusula/certs/server.crt"
-    key: "/opt/pusula/certs/server.key"
-
-auth:
-  username: "goktugorgn"
-  passwordHash: "$argon2id$..." # Generated on setup
-  jwtSecret: "..." # Generated on install
-  tokenExpiry: "24h"
-
-rateLimit:
-  login:
-    max: 5
-    window: "1m"
-  api:
-    max: 60
-    window: "1m"
-
-lockout:
-  threshold: 5
-  duration: "15m"
-
-unbound:
-  configDir: "/etc/unbound/unbound.conf.d"
-  controlSocket: "/var/run/unbound/control"
-
-snapshots:
-  dir: "/opt/pusula/snapshots"
-  maxCount: 10
+  host: "0.0.0.0"
+  port: 3000
 
 pihole:
-  enabled: true
-  apiUrl: "http://localhost/admin/api.php"
+  enabled: false
+  baseUrl: "http://localhost"
   apiToken: "" # Optional
 ```
+
+### Credentials File
+
+```json
+// /etc/unbound-ui/credentials.json
+{
+  "username": "goktugorgn",
+  "passwordHash": "$2b$12$..." // bcrypt hash
+}
+```
+
+### Environment Variables
+
+| Variable           | Description                |
+| ------------------ | -------------------------- |
+| `JWT_SECRET`       | JWT signing key (required) |
+| `NODE_ENV`         | production / development   |
+| `CONFIG_PATH`      | Path to config.yaml        |
+| `CREDENTIALS_PATH` | Path to credentials.json   |
 
 ---
 
@@ -130,9 +119,11 @@ pihole:
 Snapshots are created automatically before every configuration change:
 
 ```
-/opt/pusula/snapshots/
-├── 2026-01-17T14-30-00_forward.conf
-├── 2026-01-17T15-45-00_forward.conf
+/var/lib/unbound-ui/backups/
+├── 20260117T143000Z/
+│   ├── managed.conf
+│   ├── upstream.json
+│   └── metadata.json
 └── ...
 ```
 
@@ -141,9 +132,9 @@ Snapshots are created automatically before every configuration change:
 ```bash
 # Backup entire Pusula installation
 sudo tar -czf pusula-backup-$(date +%Y%m%d).tar.gz \
-  /opt/pusula/config \
-  /opt/pusula/snapshots \
-  /etc/unbound/unbound.conf.d
+  /etc/unbound-ui \
+  /var/lib/unbound-ui \
+  /etc/unbound/unbound-ui-managed.conf
 ```
 
 ### Restore Configuration
@@ -188,11 +179,12 @@ Breaking changes will be documented in [10-changelog.md](10-changelog.md).
 
 ### Log Locations
 
-| Log            | Path                           |
-| -------------- | ------------------------------ |
-| Pusula backend | `journalctl -u pusula`         |
-| Audit log      | `/opt/pusula/logs/audit.log`   |
-| Unbound        | `/var/log/unbound/unbound.log` |
+| Log            | Path                              |
+| -------------- | --------------------------------- |
+| Pusula backend | `journalctl -u pusula`            |
+| Audit log      | `/var/log/unbound-ui/audit.log`   |
+| Alerts store   | `/var/lib/unbound-ui/alerts.json` |
+| Unbound        | `/var/log/unbound/unbound.log`    |
 
 ### Metrics to Watch
 

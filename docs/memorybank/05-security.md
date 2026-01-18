@@ -28,7 +28,7 @@ Pusula implements defense-in-depth with multiple security layers appropriate for
 | Aspect           | Details                     |
 | ---------------- | --------------------------- |
 | Username         | `goktugorgn` (configurable) |
-| Password storage | Argon2id hash               |
+| Password storage | bcrypt hash (12 rounds)     |
 | Session          | JWT with httpOnly cookie    |
 | Token expiry     | 24 hours (configurable)     |
 
@@ -82,11 +82,11 @@ const ALLOWED_COMMANDS = {
 
 ### File Operations
 
-| Operation | Restriction                                     |
-| --------- | ----------------------------------------------- |
-| Read      | Limited to `/etc/unbound/`, `/var/log/unbound/` |
-| Write     | Limited to `/etc/unbound/unbound.conf.d/`       |
-| Backup    | Limited to `/opt/pusula/snapshots/`             |
+| Operation | Restriction                                       |
+| --------- | ------------------------------------------------- |
+| Read      | Limited to `/etc/unbound/`, `/var/log/unbound/`   |
+| Write     | Limited to `/etc/unbound/unbound-ui-managed.conf` |
+| Backup    | Limited to `/var/lib/unbound-ui/backups/`         |
 
 ---
 
@@ -131,7 +131,8 @@ All state-changing actions are logged:
 ### Log Location
 
 ```
-/opt/pusula/logs/audit.log
+/var/log/unbound-ui/audit.log   # Production
+./audit.log                     # Development
 ```
 
 Rotation: Daily, 30 days retention.
@@ -178,12 +179,12 @@ Rotation: Daily, 30 days retention.
 
 | Secret             | Storage                             |
 | ------------------ | ----------------------------------- |
-| User password hash | `/opt/pusula/config/pusula.yaml`    |
-| JWT signing key    | Environment variable or config file |
+| User password hash | `/etc/unbound-ui/credentials.json`  |
+| JWT signing key    | `JWT_SECRET` env var or config file |
 | Pi-hole API token  | Config file (optional)              |
 
 > [!WARNING]
-> Protect `/opt/pusula/config/` with appropriate file permissions (600 or 640).
+> Protect `/etc/unbound-ui/` with appropriate file permissions (600 or 640).
 
 ---
 
