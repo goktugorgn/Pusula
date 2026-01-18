@@ -12,15 +12,15 @@ This runbook provides step-by-step procedures for common operational scenarios.
 
 ```bash
 sudo systemctl start unbound
-sudo systemctl start cloudflared  # If using DoH
-sudo systemctl start pusula
+sudo systemctl start unbound-ui-doh-proxy  # If using DoH
+sudo systemctl start unbound-ui-backend
 ```
 
 ### Verify Startup
 
 ```bash
 # Check service status
-sudo systemctl status pusula unbound cloudflared
+sudo systemctl status unbound-ui-backend unbound
 
 # Verify web UI
 curl -k https://localhost:3000/api/health
@@ -33,8 +33,8 @@ curl -k https://localhost:3000/api/health
 ### Graceful Shutdown
 
 ```bash
-sudo systemctl stop pusula
-sudo systemctl stop cloudflared
+sudo systemctl stop unbound-ui-backend
+sudo systemctl stop unbound-ui-doh-proxy  # If enabled
 sudo systemctl stop unbound
 ```
 
@@ -126,13 +126,13 @@ curl -X POST https://localhost:3000/api/self-test \
 
 ```bash
 # Check for lockout
-grep "login_failure" /opt/pusula/logs/audit.log | tail -20
+grep "login_failure" /var/log/unbound-ui/audit.log | tail -20
 
 # Check rate limit
-grep "rate_limited" /opt/pusula/logs/audit.log | tail -10
+grep "rate_limited" /var/log/unbound-ui/audit.log | tail -10
 
 # Reset lockout (emergency)
-sudo systemctl restart pusula
+sudo systemctl restart unbound-ui-backend
 ```
 
 ### Backend Not Starting
@@ -247,10 +247,10 @@ sudo unbound-control flush_zone .
 
 ```bash
 # List snapshots
-ls -la /opt/pusula/snapshots/
+ls -la /var/lib/unbound-ui/backups/
 
 # Remove old snapshots (keep last 10)
-cd /opt/pusula/snapshots
+cd /var/lib/unbound-ui/backups
 ls -t | tail -n +11 | xargs rm -f
 ```
 
@@ -274,7 +274,7 @@ curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/install.sh |
 sudo tar -xzf /tmp/pusula-backup.tar.gz -C /
 
 # 4. Restart services
-sudo systemctl restart unbound pusula
+sudo systemctl restart unbound unbound-ui-backend
 ```
 
 ### Password Reset
@@ -307,31 +307,74 @@ sudo systemctl restart unbound-ui-backend
 
 ```bash
 # Review recent login attempts
-grep "login" /opt/pusula/logs/audit.log | tail -50
+grep "login" /var/log/unbound-ui/audit.log | tail -50
 
 # Review config changes
-grep "config_apply\|upstream_change" /opt/pusula/logs/audit.log
+grep "config_apply\|upstream_change" /var/log/unbound-ui/audit.log
 ```
 
 ---
 
 ## Health Checks
 
-### Quick Health Check
+### Quick Smoke Test Checklist
+
+After installation or updates, run these checks to verify the system is working:
 
 ```bash
 #!/bin/bash
-echo "=== Pusula Health Check ==="
+# Save as: /opt/pusula/smoke-test.sh
 
-echo -n "Backend: "
-curl -s -k https://localhost:3000/api/health | jq -r '.status // "DOWN"'
+echo "=== Pusula Smoke Test ==="
+echo ""
 
-echo -n "Unbound: "
-sudo unbound-control status | head -1
+# 1. Service status
+echo "1. Service Status:"
+echo -n "   Backend:  "
+systemctl is-active unbound-ui-backend 2>/dev/null || echo "NOT RUNNING"
 
-echo -n "DNS Test: "
-dig +short example.com @127.0.0.1 || echo "FAILED"
+echo -n "   Unbound:  "
+systemctl is-active unbound 2>/dev/null || echo "NOT RUNNING"
+echo ""
+
+# 2. Health endpoint
+echo "2. Health Endpoint:"
+echo -n "   HTTP API: "
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health && echo " OK" || echo " FAILED"
+echo ""
+
+# 3. DNS resolution
+echo "3. DNS Resolution:"
+echo -n "   Query:    "
+dig +short example.com @127.0.0.1 | head -1 || echo "FAILED"
+echo ""
+
+# 4. Unbound control
+echo "4. Unbound Control:"
+echo -n "   Status:   "
+sudo unbound-control status 2>/dev/null | head -1 || echo "FAILED"
+echo ""
+
+# 5. File permissions
+echo "5. File Permissions:"
+echo -n "   Config:   "
+[ -r /etc/unbound-ui/config.yaml ] && echo "OK" || echo "NOT READABLE"
+echo -n "   Creds:    "
+[ -f /etc/unbound-ui/credentials.json ] && echo "OK" || echo "MISSING"
+echo ""
+
+echo "=== Smoke Test Complete ==="
 ```
+
+### Manual Verification Steps
+
+| Check            | Command                                                | Expected    |
+| ---------------- | ------------------------------------------------------ | ----------- |
+| Backend running  | `systemctl is-active unbound-ui-backend`               | `active`    |
+| Unbound running  | `systemctl is-active unbound`                          | `active`    |
+| Health endpoint  | `curl -s localhost:3000/api/health \| jq .data.status` | `"healthy"` |
+| DNS working      | `dig +short example.com @127.0.0.1`                    | IP address  |
+| Login page loads | Open `http://<pi-ip>:3000` in browser                  | Login form  |
 
 ---
 

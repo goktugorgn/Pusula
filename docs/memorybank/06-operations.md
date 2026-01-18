@@ -334,12 +334,12 @@ Breaking changes will be documented in [10-changelog.md](10-changelog.md).
 
 ### Log Locations
 
-| Log            | Path                              |
-| -------------- | --------------------------------- |
-| Pusula backend | `journalctl -u pusula`            |
-| Audit log      | `/var/log/unbound-ui/audit.log`   |
-| Alerts store   | `/var/lib/unbound-ui/alerts.json` |
-| Unbound        | `/var/log/unbound/unbound.log`    |
+| Log            | Path                               |
+| -------------- | ---------------------------------- |
+| Pusula backend | `journalctl -u unbound-ui-backend` |
+| Audit log      | `/var/log/unbound-ui/audit.log`    |
+| Alerts store   | `/var/lib/unbound-ui/alerts.json`  |
+| Unbound        | `/var/log/unbound/unbound.log`     |
 
 ### Metrics to Watch
 

@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Documentation Sync (2026-01-18)**:
+  - Added `/api/logout` endpoint to API contract and OpenAPI spec
+  - Added comprehensive smoke test checklist to runbook
+  - Added manual verification steps table to runbook
+
+### Changed
+
+- **Documentation Corrections**:
+  - Fixed password hashing algorithm in ADR summary (Argon2 → bcrypt)
+  - Fixed HTTPS section in security docs (optional, not enforced)
+  - Corrected service names throughout docs (`pusula` → `unbound-ui-backend`)
+  - Fixed file paths in runbook (`/opt/pusula/logs/` → `/var/log/unbound-ui/`)
+  - Fixed snapshot paths in runbook (`/opt/pusula/snapshots/` → `/var/lib/unbound-ui/backups/`)
+
 - **Backend API** (Node.js + Fastify + TypeScript)
 - **Authentication**: bcrypt password hashing, JWT sessions, secure cookies
 - **Rate Limiting**: 5/min login, 60/min API
