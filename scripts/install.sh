@@ -204,8 +204,8 @@ EOF
     
     # Credentials file
     if [[ ! -f "$CONFIG_DIR/credentials.json" ]]; then
-        # Generate random password (16 chars)
-        INITIAL_PASSWORD=$(tr -dc 'A-Za-z0-9!@#$%' < /dev/urandom | head -c 16)
+        # Default password
+        INITIAL_PASSWORD="admin"
         
         # Generate bcrypt hash using node
         PASSWORD_HASH=$(node -e "
@@ -292,7 +292,7 @@ install_application() {
     # Generate password if needed
     if [[ "${GENERATE_PASSWORD_LATER:-0}" == "1" ]]; then
         cd "$INSTALL_DIR/backend"
-        INITIAL_PASSWORD=$(tr -dc 'A-Za-z0-9!@#$%' < /dev/urandom | head -c 16)
+        INITIAL_PASSWORD="admin"
         PASSWORD_HASH=$(node -e "
             const bcrypt = require('bcrypt');
             console.log(bcrypt.hashSync('$INITIAL_PASSWORD', 12));

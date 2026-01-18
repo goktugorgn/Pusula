@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed file paths in runbook (`/opt/pusula/logs/` → `/var/log/unbound-ui/`)
   - Fixed snapshot paths in runbook (`/opt/pusula/snapshots/` → `/var/lib/unbound-ui/backups/`)
 
+- **Default Credentials**:
+  - Changed default username from `goktugorgn` to `admin` across all files
+  - Changed default installer password to `admin` (was randomly generated)
+
 - **Backend API** (Node.js + Fastify + TypeScript)
 - **Authentication**: bcrypt password hashing, JWT sessions, secure cookies
 - **Rate Limiting**: 5/min login, 60/min API

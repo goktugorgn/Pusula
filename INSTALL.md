@@ -51,7 +51,7 @@ After installation, you'll see:
 
   Initial Credentials:
     Username: admin
-    Password: X7kQ!2pLm@9nR#4s
+    Password: admin
 
   ⚠️  IMPORTANT: Save this password!
 ```
