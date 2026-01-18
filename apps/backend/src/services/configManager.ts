@@ -3,11 +3,26 @@
  * Handles safe apply workflow: snapshot → validate → apply → reload → self-test → rollback
  */
 
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { join, basename } from 'node:path';
 import { checkConfig, reloadUnbound } from './unboundControl.js';
 import { ServiceError } from '../utils/errors.js';
-import { loadUpstreamConfig, invalidateUpstreamCache, type UpstreamConfig } from '../config/index.js';
+import { atomicWriteSync } from '../utils/atomicWrite.js';
+import {
+  loadUpstreamConfig,
+  invalidateUpstreamCache,
+  type UpstreamConfig,
+  type DotProvider,
+  type DohProvider,
+} from '../config/index.js';
 
 // Max snapshots to keep
 const MAX_SNAPSHOTS = 10;
@@ -169,46 +184,89 @@ function cleanupOldSnapshots(): void {
 
 /**
  * Generate Unbound managed config from upstream settings
+ * Exported for unit testing
  */
 export function generateManagedConfig(config: UpstreamConfig): string {
   const lines: string[] = [
     '# Pusula managed configuration',
     '# DO NOT EDIT MANUALLY - changes will be overwritten',
+    `# Generated: ${new Date().toISOString()}`,
     '',
     `# Mode: ${config.mode}`,
     '',
   ];
 
   if (config.mode === 'recursive') {
+    // Recursive mode - no forward-zone
     lines.push('# Recursive mode - direct root resolution');
     lines.push('# No forward-zone configuration');
   } else if (config.mode === 'dot') {
-    const enabled = config.dotProviders.filter((p) => p.enabled);
+    // DoT mode - forward to TLS upstreams
+    const enabled = config.dotProviders
+      .filter((p) => p.enabled)
+      .sort((a, b) => (a.priority ?? 10) - (b.priority ?? 10));
+
     if (enabled.length > 0) {
       lines.push('forward-zone:');
       lines.push('    name: "."');
       lines.push('    forward-tls-upstream: yes');
+
       for (const provider of enabled) {
         const port = provider.port || 853;
         const sni = provider.sni || '';
+        // Format: address@port#sni
         lines.push(`    forward-addr: ${provider.address}@${port}#${sni}`);
       }
+    } else {
+      lines.push('# DoT mode but no enabled providers');
+      lines.push('# Falling back to recursive resolution');
     }
   } else if (config.mode === 'doh') {
-    // DoH typically uses a local proxy
+    // DoH mode - forward to local proxy
+    // The proxy (cloudflared/dnscrypt-proxy) handles the actual DoH
+    const localPort = config.dohProxy?.localPort || 5053;
+
     lines.push('# DoH mode - forwarding to local proxy');
+    lines.push(`# Proxy type: ${config.dohProxy?.type || 'cloudflared'}`);
+    lines.push(`# Proxy port: ${localPort}`);
+    lines.push('');
     lines.push('forward-zone:');
     lines.push('    name: "."');
-    lines.push('    forward-addr: 127.0.0.1@5053');
+    lines.push(`    forward-addr: 127.0.0.1@${localPort}`);
   }
 
   return lines.join('\n') + '\n';
 }
 
 /**
+ * Save upstream configuration atomically
+ */
+export function saveUpstreamConfig(config: UpstreamConfig): void {
+  const result = atomicWriteSync(
+    UPSTREAM_PATH,
+    JSON.stringify(config, null, 2)
+  );
+
+  if (!result.success) {
+    throw new ServiceError(`Failed to save upstream config: ${result.error}`);
+  }
+
+  invalidateUpstreamCache();
+}
+
+/**
  * Apply new configuration safely
  *
- * @returns Snapshot ID if successful
+ * Workflow:
+ * 1. Create snapshot of current config
+ * 2. Generate new managed config
+ * 3. Write to temp file + fsync
+ * 4. Validate with unbound-checkconf
+ * 5. Atomic rename to target
+ * 6. Reload Unbound
+ * 7. On any failure: rollback
+ *
+ * @returns Snapshot ID and success status
  */
 export async function applyConfig(
   newConfig: UpstreamConfig
@@ -220,27 +278,20 @@ export async function applyConfig(
     // Generate new managed config
     const newManagedConf = generateManagedConfig(newConfig);
 
-    // Write to temp file first
-    const tempPath = `${MANAGED_CONF}.tmp`;
-    writeFileSync(tempPath, newManagedConf, { mode: 0o644 });
+    // Write managed conf atomically
+    const confResult = atomicWriteSync(MANAGED_CONF, newManagedConf, 0o644);
+    if (!confResult.success) {
+      throw new ServiceError(`Failed to write managed config: ${confResult.error}`);
+    }
 
     // Validate with unbound-checkconf
     const valid = await checkConfig();
     if (!valid) {
-      // Cleanup temp file
-      if (existsSync(tempPath)) {
-        rmSync(tempPath);
-      }
       throw new ServiceError('Configuration validation failed');
     }
 
-    // Atomic move
-    const { renameSync } = await import('node:fs');
-    renameSync(tempPath, MANAGED_CONF);
-
-    // Write upstream config
-    writeFileSync(UPSTREAM_PATH, JSON.stringify(newConfig, null, 2));
-    invalidateUpstreamCache();
+    // Write upstream config atomically
+    saveUpstreamConfig(newConfig);
 
     // Reload Unbound
     await reloadUnbound();
@@ -263,5 +314,6 @@ export default {
   getLatestSnapshotId,
   listSnapshots,
   generateManagedConfig,
+  saveUpstreamConfig,
   applyConfig,
 };

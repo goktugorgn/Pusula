@@ -19,26 +19,20 @@ export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
 
   /**
    * GET /api/upstream
+   * Returns full upstream configuration
    */
   fastify.get('/upstream', async (_request: FastifyRequest, _reply: FastifyReply) => {
     const config = loadUpstreamConfig();
 
     return {
       success: true,
-      data: {
-        mode: config.mode,
-        upstreams:
-          config.mode === 'dot'
-            ? config.dotProviders
-            : config.mode === 'doh'
-              ? config.dohProviders
-              : [],
-      },
+      data: config,
     };
   });
 
   /**
    * PUT /api/upstream
+   * Updates upstream configuration with apply workflow
    */
   fastify.put(
     '/upstream',
@@ -50,6 +44,8 @@ export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
         mode: 'recursive' | 'dot' | 'doh';
         dotProviders?: any[];
         dohProviders?: any[];
+        activeOrder?: string[];
+        dohProxy?: { type: 'cloudflared' | 'dnscrypt-proxy'; localPort: number };
         runSelfTest?: boolean;
       };
 
@@ -57,11 +53,13 @@ export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
       const user = request.user.username;
       const currentConfig = loadUpstreamConfig();
 
-      // Build new config
+      // Build new config (merge with current, not replace)
       const newConfig = {
         mode: body.mode,
-        dotProviders: body.dotProviders || currentConfig.dotProviders,
-        dohProviders: body.dohProviders || currentConfig.dohProviders,
+        dotProviders: body.dotProviders ?? currentConfig.dotProviders,
+        dohProviders: body.dohProviders ?? currentConfig.dohProviders,
+        activeOrder: body.activeOrder ?? currentConfig.activeOrder,
+        dohProxy: body.dohProxy ?? currentConfig.dohProxy,
       };
 
       // Log mode change if applicable
@@ -79,7 +77,6 @@ export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
           selfTestPassed = await runQuickTest();
 
           if (!selfTestPassed) {
-            // Self-test failed, config already rolled back by applyConfig on error
             logConfigChange(ip, user, 'apply', { mode: body.mode, snapshotId }, false, 'Self-test failed');
 
             return {

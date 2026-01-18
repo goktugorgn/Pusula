@@ -66,25 +66,43 @@ export const credentialsSchema = z.object({
 
 export type Credentials = z.infer<typeof credentialsSchema>;
 
-// Upstream provider schema
-export const upstreamProviderSchema = z.object({
-  id: z.string(),
-  type: z.enum(['dot', 'doh']),
-  address: z.string(),
-  port: z.number().int().optional(),
-  sni: z.string().optional(),
+// DoT provider schema
+export const dotProviderSchema = z.object({
+  id: z.string().min(1),
   name: z.string().optional(),
+  address: z.string().min(1),
+  port: z.number().int().min(1).max(65535).default(853),
+  sni: z.string().optional(),
   enabled: z.boolean().default(true),
   priority: z.number().int().optional(),
 });
 
-export type UpstreamProvider = z.infer<typeof upstreamProviderSchema>;
+export type DotProvider = z.infer<typeof dotProviderSchema>;
+
+// DoH provider schema
+export const dohProviderSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().optional(),
+  endpointUrl: z.string().url(),
+  enabled: z.boolean().default(true),
+  priority: z.number().int().optional(),
+});
+
+export type DohProvider = z.infer<typeof dohProviderSchema>;
 
 // Upstream configuration schema
 export const upstreamConfigSchema = z.object({
   mode: z.enum(['recursive', 'dot', 'doh']).default('recursive'),
-  dotProviders: z.array(upstreamProviderSchema).default([]),
-  dohProviders: z.array(upstreamProviderSchema).default([]),
+  dotProviders: z.array(dotProviderSchema).default([]),
+  dohProviders: z.array(dohProviderSchema).default([]),
+  activeOrder: z.array(z.string()).default([]),
+  // DoH proxy configuration
+  dohProxy: z
+    .object({
+      type: z.enum(['cloudflared', 'dnscrypt-proxy']).default('cloudflared'),
+      localPort: z.number().int().min(1).max(65535).default(5053),
+    })
+    .default({}),
 });
 
 export type UpstreamConfig = z.infer<typeof upstreamConfigSchema>;
@@ -107,8 +125,15 @@ export const flushCacheRequestSchema = z.object({
 
 export const updateUpstreamRequestSchema = z.object({
   mode: z.enum(['recursive', 'dot', 'doh']),
-  dotProviders: z.array(upstreamProviderSchema).optional(),
-  dohProviders: z.array(upstreamProviderSchema).optional(),
+  dotProviders: z.array(dotProviderSchema).optional(),
+  dohProviders: z.array(dohProviderSchema).optional(),
+  activeOrder: z.array(z.string()).optional(),
+  dohProxy: z
+    .object({
+      type: z.enum(['cloudflared', 'dnscrypt-proxy']),
+      localPort: z.number().int().min(1).max(65535),
+    })
+    .optional(),
   runSelfTest: z.boolean().default(true),
 });
 
