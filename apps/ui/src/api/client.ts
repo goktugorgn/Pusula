@@ -1,9 +1,22 @@
 /**
  * API Client
- * Handles all API requests with auth support
+ * 
+ * Features:
+ * - Base URL from VITE_API_BASE_URL (defaults to same-origin /api)
+ * - Fetch wrapper with JSON parsing
+ * - Authorization header when token exists
+ * - Normalized error handling (401, 429, etc.)
  */
 
-const API_BASE = '/api';
+// ============================================================================
+// Configuration
+// ============================================================================
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -14,69 +27,263 @@ export interface ApiResponse<T> {
   };
 }
 
-export class ApiError extends Error {
-  code: string;
-  status: number;
+export type ErrorCode =
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'VALIDATION_ERROR'
+  | 'RATE_LIMITED'
+  | 'LOCKED_OUT'
+  | 'SERVICE_ERROR'
+  | 'NETWORK_ERROR'
+  | 'UNKNOWN_ERROR';
 
-  constructor(code: string, message: string, status: number) {
+export class ApiError extends Error {
+  code: ErrorCode;
+  status: number;
+  isAuthError: boolean;
+  isRateLimited: boolean;
+  isLockedOut: boolean;
+  retryAfter?: number;
+
+  constructor(
+    code: ErrorCode,
+    message: string,
+    status: number,
+    retryAfter?: number
+  ) {
     super(message);
+    this.name = 'ApiError';
     this.code = code;
     this.status = status;
+    this.isAuthError = status === 401;
+    this.isRateLimited = status === 429;
+    this.isLockedOut = status === 423;
+    this.retryAfter = retryAfter;
   }
 }
 
+// ============================================================================
+// Token Management
+// ============================================================================
+
 /**
- * Fetch wrapper with auth handling
+ * Token storage strategy:
+ * - Primary: In-memory (more secure, cleared on page refresh)
+ * - Fallback: localStorage (persists across sessions)
+ * 
+ * Tradeoffs:
+ * - In-memory: More secure (no XSS access), but user must re-login after refresh
+ * - localStorage: Convenient (persists), but vulnerable to XSS attacks
+ * 
+ * We use in-memory as primary and localStorage as a persistence layer that
+ * can be optionally enabled via "remember me" functionality.
+ */
+
+let inMemoryToken: string | null = null;
+
+export const tokenStore = {
+  get(): string | null {
+    // Check in-memory first
+    if (inMemoryToken) return inMemoryToken;
+    
+    // Fallback to localStorage
+    return localStorage.getItem('auth_token');
+  },
+
+  set(token: string, persist = false): void {
+    inMemoryToken = token;
+    
+    if (persist) {
+      localStorage.setItem('auth_token', token);
+    }
+  },
+
+  clear(): void {
+    inMemoryToken = null;
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('authenticated');
+  },
+
+  isAuthenticated(): boolean {
+    return !!this.get();
+  },
+};
+
+// ============================================================================
+// Fetch Wrapper
+// ============================================================================
+
+// Event for auth state changes (used by route guards)
+export const authEvents = new EventTarget();
+
+export function dispatchAuthChange(authenticated: boolean): void {
+  authEvents.dispatchEvent(
+    new CustomEvent('authchange', { detail: { authenticated } })
+  );
+}
+
+/**
+ * Main fetch wrapper with auth and error handling
  */
 export async function fetchApi<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include', // Send httpOnly cookie
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+  const token = tokenStore.get();
 
-  // Handle 401 - redirect to login
-  if (res.status === 401) {
-    localStorage.removeItem('authenticated');
-    window.location.href = '/login';
-    throw new ApiError('UNAUTHORIZED', 'Session expired', 401);
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  // Attach auth header if token exists
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
 
-  const json: ApiResponse<T> = await res.json();
+  let res: Response;
 
-  if (!json.success || !json.data) {
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include', // Also send httpOnly cookie
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    // Network error (offline, CORS, etc.)
     throw new ApiError(
-      json.error?.code || 'UNKNOWN_ERROR',
+      'NETWORK_ERROR',
+      'Unable to connect to server. Please check your connection.',
+      0
+    );
+  }
+
+  // Parse response
+  let json: ApiResponse<T>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError(
+      'UNKNOWN_ERROR',
+      'Invalid response from server',
+      res.status
+    );
+  }
+
+  // Handle HTTP errors
+  if (!res.ok) {
+    const retryAfter = res.headers.get('Retry-After');
+    const code = mapStatusToCode(res.status, json.error?.code);
+    const message = json.error?.message || getDefaultMessage(code);
+
+    // Handle 401 - trigger logout
+    if (res.status === 401) {
+      tokenStore.clear();
+      dispatchAuthChange(false);
+    }
+
+    throw new ApiError(
+      code,
+      message,
+      res.status,
+      retryAfter ? parseInt(retryAfter, 10) : undefined
+    );
+  }
+
+  // Handle API-level errors
+  if (!json.success) {
+    throw new ApiError(
+      (json.error?.code as ErrorCode) || 'UNKNOWN_ERROR',
       json.error?.message || 'An error occurred',
       res.status
     );
   }
 
-  return json.data;
+  return json.data as T;
 }
 
-/**
- * POST request helper
- */
-export async function postApi<T>(path: string, body: unknown): Promise<T> {
+// ============================================================================
+// Request Helpers
+// ============================================================================
+
+export async function getApi<T>(path: string): Promise<T> {
+  return fetchApi<T>(path, { method: 'GET' });
+}
+
+export async function postApi<T>(path: string, body?: unknown): Promise<T> {
   return fetchApi<T>(path, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
   });
 }
 
-/**
- * PUT request helper
- */
 export async function putApi<T>(path: string, body: unknown): Promise<T> {
   return fetchApi<T>(path, {
     method: 'PUT',
     body: JSON.stringify(body),
   });
+}
+
+export async function deleteApi<T>(path: string): Promise<T> {
+  return fetchApi<T>(path, { method: 'DELETE' });
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function mapStatusToCode(status: number, apiCode?: string): ErrorCode {
+  if (apiCode && isValidErrorCode(apiCode)) {
+    return apiCode as ErrorCode;
+  }
+
+  switch (status) {
+    case 401:
+      return 'UNAUTHORIZED';
+    case 403:
+      return 'FORBIDDEN';
+    case 404:
+      return 'NOT_FOUND';
+    case 400:
+      return 'VALIDATION_ERROR';
+    case 429:
+      return 'RATE_LIMITED';
+    case 423:
+      return 'LOCKED_OUT';
+    case 503:
+      return 'SERVICE_ERROR';
+    default:
+      return 'UNKNOWN_ERROR';
+  }
+}
+
+function isValidErrorCode(code: string): boolean {
+  const validCodes: ErrorCode[] = [
+    'UNAUTHORIZED',
+    'FORBIDDEN',
+    'NOT_FOUND',
+    'VALIDATION_ERROR',
+    'RATE_LIMITED',
+    'LOCKED_OUT',
+    'SERVICE_ERROR',
+    'NETWORK_ERROR',
+    'UNKNOWN_ERROR',
+  ];
+  return validCodes.includes(code as ErrorCode);
+}
+
+function getDefaultMessage(code: ErrorCode): string {
+  const messages: Record<ErrorCode, string> = {
+    UNAUTHORIZED: 'Please log in to continue',
+    FORBIDDEN: 'You do not have permission for this action',
+    NOT_FOUND: 'The requested resource was not found',
+    VALIDATION_ERROR: 'Please check your input',
+    RATE_LIMITED: 'Too many requests. Please wait and try again.',
+    LOCKED_OUT: 'Account temporarily locked. Please try again later.',
+    SERVICE_ERROR: 'Service temporarily unavailable',
+    NETWORK_ERROR: 'Unable to connect to server',
+    UNKNOWN_ERROR: 'An unexpected error occurred',
+  };
+  return messages[code];
 }

@@ -1,19 +1,13 @@
 /**
- * App Shell Layout
+ * App Shell Layout - with auth integration
  */
 
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useLogout } from '../api';
+import { Outlet, NavLink } from 'react-router-dom';
+import { useAuth } from '../api/auth';
+import { Badge } from './ui';
 
 export default function AppShell() {
-  const navigate = useNavigate();
-  const logout = useLogout();
-
-  const handleLogout = () => {
-    logout.mutate(undefined, {
-      onSuccess: () => navigate('/login'),
-    });
-  };
+  const { user, logout } = useAuth();
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
@@ -24,40 +18,65 @@ export default function AppShell() {
     { path: '/settings', label: 'Settings', icon: '⚙️' },
   ];
 
+  // Dev-only style guide link
+  const isDev = import.meta.env.DEV;
+
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside className="w-64 glass-dark p-4 flex flex-col">
-        <div className="text-xl font-bold text-white mb-8 px-4">
-          Pusula
+        <div className="px-4 mb-8">
+          <div className="text-xl font-bold text-white">Pusula</div>
+          {user && (
+            <div className="text-white/50 text-sm mt-1">
+              {user.username}
+            </div>
+          )}
         </div>
 
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-1">
           {navItems.map(({ path, label, icon }) => (
             <NavLink
               key={path}
               to={path}
               end={path === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? 'bg-white/20 text-white'
+                    ? 'bg-white/20 text-white shadow-lg'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
-              <span>{icon}</span>
-              <span>{label}</span>
+              <span className="text-lg">{icon}</span>
+              <span className="font-medium">{label}</span>
             </NavLink>
           ))}
+          
+          {isDev && (
+            <NavLink
+              to="/style-guide"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/50 hover:bg-white/10 hover:text-white/70'
+                }`
+              }
+            >
+              <span className="text-lg">🎨</span>
+              <span className="font-medium">Style Guide</span>
+              <Badge size="sm" variant="warning">DEV</Badge>
+            </NavLink>
+          )}
         </nav>
 
         <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          onClick={logout}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200"
         >
-          <span>🚪</span>
-          <span>Logout</span>
+          <span className="text-lg">🚪</span>
+          <span className="font-medium">Logout</span>
         </button>
       </aside>
 
