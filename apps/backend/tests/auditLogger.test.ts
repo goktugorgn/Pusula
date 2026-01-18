@@ -30,7 +30,7 @@ describe('auditLogger', () => {
 
   describe('logLogin', () => {
     it('logs successful login', () => {
-      logLogin('192.168.1.100', 'goktugorgn', true, 'Mozilla/5.0');
+      logLogin('192.168.1.100', 'admin', true, 'Mozilla/5.0');
 
       expect(appendFileSync).toHaveBeenCalledTimes(1);
       const call = (appendFileSync as any).mock.calls[0];
@@ -38,13 +38,13 @@ describe('auditLogger', () => {
 
       expect(entry.event).toBe('login_success');
       expect(entry.actor.ip).toBe('192.168.1.100');
-      expect(entry.actor.user).toBe('goktugorgn');
+      expect(entry.actor.user).toBe('admin');
       expect(entry.result).toBe('success');
       expect(entry.timestamp).toBeDefined();
     });
 
     it('logs failed login with error', () => {
-      logLogin('192.168.1.100', 'goktugorgn', false, 'Mozilla/5.0', 'Invalid credentials');
+      logLogin('192.168.1.100', 'admin', false, 'Mozilla/5.0', 'Invalid credentials');
 
       expect(appendFileSync).toHaveBeenCalledTimes(1);
       const call = (appendFileSync as any).mock.calls[0];
@@ -58,7 +58,7 @@ describe('auditLogger', () => {
 
   describe('logPasswordChange', () => {
     it('logs successful password change', () => {
-      logPasswordChange('192.168.1.100', 'goktugorgn', true);
+      logPasswordChange('192.168.1.100', 'admin', true);
 
       expect(appendFileSync).toHaveBeenCalledTimes(1);
       const call = (appendFileSync as any).mock.calls[0];
@@ -69,7 +69,7 @@ describe('auditLogger', () => {
     });
 
     it('logs failed password change', () => {
-      logPasswordChange('192.168.1.100', 'goktugorgn', false, 'Invalid current password');
+      logPasswordChange('192.168.1.100', 'admin', false, 'Invalid current password');
 
       expect(appendFileSync).toHaveBeenCalledTimes(1);
       const call = (appendFileSync as any).mock.calls[0];

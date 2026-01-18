@@ -39,11 +39,11 @@ describe('Alert Store', () => {
         details: { rate: 15.5 },
         createdAt: '2026-01-18T12:00:00Z',
         updatedAt: '2026-01-18T12:05:00Z',
-        acknowledgedBy: 'goktugorgn',
+        acknowledgedBy: 'admin',
         acknowledgedAt: '2026-01-18T12:05:00Z',
       };
 
-      expect(alert.acknowledgedBy).toBe('goktugorgn');
+      expect(alert.acknowledgedBy).toBe('admin');
       expect(alert.details?.rate).toBe(15.5);
     });
   });

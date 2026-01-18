@@ -205,9 +205,9 @@ function AuditLogSection() {
 
   // Placeholder - wire to /api/audit-log when available
   const mockLogs = [
-    { timestamp: new Date().toISOString(), action: 'login', user: 'goktugorgn', ip: '192.168.1.100' },
-    { timestamp: new Date(Date.now() - 3600000).toISOString(), action: 'config_change', user: 'goktugorgn', ip: '192.168.1.100' },
-    { timestamp: new Date(Date.now() - 7200000).toISOString(), action: 'restart', user: 'goktugorgn', ip: '192.168.1.100' },
+    { timestamp: new Date().toISOString(), action: 'login', user: 'admin', ip: '192.168.1.100' },
+    { timestamp: new Date(Date.now() - 3600000).toISOString(), action: 'config_change', user: 'admin', ip: '192.168.1.100' },
+    { timestamp: new Date(Date.now() - 7200000).toISOString(), action: 'restart', user: 'admin', ip: '192.168.1.100' },
   ];
 
   const handleExport = useCallback(() => {

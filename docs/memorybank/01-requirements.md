@@ -18,7 +18,7 @@ Users can switch between three DNS resolution modes:
 
 | Requirement        | Details                |
 | ------------------ | ---------------------- |
-| Single user        | Username: `goktugorgn` |
+| Single user        | Username: `admin` |
 | Password change    | Available via UI       |
 | Session management | JWT or secure cookie   |
 

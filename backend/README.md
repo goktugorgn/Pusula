@@ -46,7 +46,7 @@ node -e "const bcrypt=require('bcrypt'); bcrypt.hash('your-password', 12).then(c
 # Create credentials.json
 sudo tee /etc/unbound-ui/credentials.json << 'EOF'
 {
-  "username": "goktugorgn",
+  "username": "admin",
   "passwordHash": "$2b$12$YOUR_HASH_HERE"
 }
 EOF

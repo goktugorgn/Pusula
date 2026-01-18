@@ -6,7 +6,7 @@
 # One-command install for Raspberry Pi OS (Bookworm+)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/scripts/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/admin/pusula/main/scripts/install.sh | sudo bash
 #
 # Or locally:
 #   sudo ./scripts/install.sh
@@ -220,7 +220,7 @@ EOF
         else
             cat > "$CONFIG_DIR/credentials.json" << EOF
 {
-  "username": "goktugorgn",
+  "username": "admin",
   "passwordHash": "$PASSWORD_HASH"
 }
 EOF
@@ -299,7 +299,7 @@ install_application() {
         ")
         cat > "$CONFIG_DIR/credentials.json" << EOF
 {
-  "username": "goktugorgn",
+  "username": "admin",
   "passwordHash": "$PASSWORD_HASH"
 }
 EOF
@@ -413,7 +413,7 @@ main() {
     echo ""
     if [[ -n "${INITIAL_PASSWORD:-}" ]]; then
         echo -e "  ${YELLOW}Initial Credentials:${NC}"
-        echo "    Username: goktugorgn"
+        echo "    Username: admin"
         echo -e "    Password: ${RED}$INITIAL_PASSWORD${NC}"
         echo ""
         echo -e "  ${YELLOW}⚠️  IMPORTANT: Save this password! It won't be shown again.${NC}"

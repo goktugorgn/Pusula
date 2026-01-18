@@ -81,11 +81,11 @@ describe('Action Endpoints', () => {
       const { logCacheFlush } = await import('../src/security/auditLogger.js');
 
       // Should not throw
-      logCacheFlush('192.168.1.100', 'goktugorgn', 'zone', 'example.com', true);
+      logCacheFlush('192.168.1.100', 'admin', 'zone', 'example.com', true);
 
       expect(mockLogCacheFlush).toHaveBeenCalledWith(
         '192.168.1.100',
-        'goktugorgn',
+        'admin',
         'zone',
         'example.com',
         true
@@ -96,11 +96,11 @@ describe('Action Endpoints', () => {
       const { logCacheFlush } = await import('../src/security/auditLogger.js');
 
       // Should not throw
-      logCacheFlush('192.168.1.100', 'goktugorgn', 'request', 'www.example.com', true);
+      logCacheFlush('192.168.1.100', 'admin', 'request', 'www.example.com', true);
 
       expect(mockLogCacheFlush).toHaveBeenCalledWith(
         '192.168.1.100',
-        'goktugorgn',
+        'admin',
         'request',
         'www.example.com',
         true
@@ -110,11 +110,11 @@ describe('Action Endpoints', () => {
     it('logServiceOp called for reload', async () => {
       const { logServiceOp } = await import('../src/security/auditLogger.js');
 
-      logServiceOp('192.168.1.100', 'goktugorgn', 'reload', 'unbound', true);
+      logServiceOp('192.168.1.100', 'admin', 'reload', 'unbound', true);
 
       expect(mockLogServiceOp).toHaveBeenCalledWith(
         '192.168.1.100',
-        'goktugorgn',
+        'admin',
         'reload',
         'unbound',
         true
@@ -124,11 +124,11 @@ describe('Action Endpoints', () => {
     it('logServiceOp called for restart', async () => {
       const { logServiceOp } = await import('../src/security/auditLogger.js');
 
-      logServiceOp('192.168.1.100', 'goktugorgn', 'restart', 'unbound', true);
+      logServiceOp('192.168.1.100', 'admin', 'restart', 'unbound', true);
 
       expect(mockLogServiceOp).toHaveBeenCalledWith(
         '192.168.1.100',
-        'goktugorgn',
+        'admin',
         'restart',
         'unbound',
         true

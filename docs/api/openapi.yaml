@@ -46,7 +46,7 @@ paths:
               properties:
                 username:
                   type: string
-                  example: goktugorgn
+                  example: admin
                 password:
                   type: string
                   format: password

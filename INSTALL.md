@@ -5,7 +5,7 @@ One-command DNS management for Raspberry Pi and Debian-based systems.
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/admin/pusula/main/scripts/install.sh | sudo bash
 ```
 
 That's it! The installer will:
@@ -30,7 +30,7 @@ That's it! The installer will:
 
 ```bash
 # Clone repository
-git clone https://github.com/goktugorgn/pusula.git
+git clone https://github.com/admin/pusula.git
 cd pusula
 
 # Run installer
@@ -50,7 +50,7 @@ After installation, you'll see:
     http://192.168.1.50:3000
 
   Initial Credentials:
-    Username: goktugorgn
+    Username: admin
     Password: X7kQ!2pLm@9nR#4s
 
   ⚠️  IMPORTANT: Save this password!
@@ -95,5 +95,5 @@ See [09-runbook.md](docs/memorybank/09-runbook.md) for detailed procedures.
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/goktugorgn/pusula/issues)
+- Issues: [GitHub Issues](https://github.com/admin/pusula/issues)
 - Documentation: [docs/memorybank/](docs/memorybank/)

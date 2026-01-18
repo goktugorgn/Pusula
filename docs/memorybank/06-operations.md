@@ -14,14 +14,14 @@
 ### One-Command Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/admin/pusula/main/install.sh | sudo bash
 ```
 
 ### Manual Installation
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/goktugorgn/pusula.git
+git clone https://github.com/admin/pusula.git
 cd pusula
 
 # 2. Run installer
@@ -82,7 +82,7 @@ sudo pusula-setup
 # /etc/systemd/system/unbound-ui-backend.service
 [Unit]
 Description=Pusula DNS Management Backend
-Documentation=https://github.com/goktugorgn/pusula
+Documentation=https://github.com/admin/pusula
 After=network.target unbound.service
 Wants=unbound.service
 
@@ -251,7 +251,7 @@ pihole:
 ```json
 // /etc/unbound-ui/credentials.json
 {
-  "username": "goktugorgn",
+  "username": "admin",
   "passwordHash": "$2b$12$..." // bcrypt hash
 }
 ```
@@ -435,7 +435,7 @@ apps/backend/mock-data/            # Static fixtures (in repo)
 
 ```bash
 # 1. Clone and setup
-git clone https://github.com/goktugorgn/pusula.git
+git clone https://github.com/admin/pusula.git
 cd pusula
 
 # 2. Setup local dev environment

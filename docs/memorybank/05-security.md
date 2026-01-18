@@ -27,7 +27,7 @@ Pusula implements defense-in-depth with multiple security layers appropriate for
 
 | Aspect           | Details                     |
 | ---------------- | --------------------------- |
-| Username         | `goktugorgn` (configurable) |
+| Username         | `admin` (configurable) |
 | Password storage | bcrypt hash (12 rounds)     |
 | Session          | JWT with httpOnly cookie    |
 | Token expiry     | 24 hours (configurable)     |
@@ -158,7 +158,7 @@ All state-changing actions are logged:
   "event": "config_apply",
   "actor": {
     "ip": "192.168.1.100",
-    "user": "goktugorgn"
+    "user": "admin"
   },
   "details": {
     "mode": "dot",

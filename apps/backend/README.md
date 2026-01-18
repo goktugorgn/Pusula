@@ -89,7 +89,7 @@ See `config.yaml` for available options.
 
 ### Authentication
 
-- **Single-user model**: Username `goktugorgn` (configurable)
+- **Single-user model**: Username `admin` (configurable)
 - **Password hashing**: bcrypt with 12 rounds
 - **Session**: JWT with httpOnly, secure, sameSite=strict cookie
 - **Token expiry**: 24 hours
@@ -118,7 +118,7 @@ JSON-lines log at `/var/log/unbound-ui/audit.log` (or `./audit.log` in dev):
 {
   "timestamp": "2026-01-17T18:00:00.000Z",
   "event": "login_success",
-  "actor": { "ip": "192.168.1.100", "user": "goktugorgn", "userAgent": "Mozilla/5.0" },
+  "actor": { "ip": "192.168.1.100", "user": "admin", "userAgent": "Mozilla/5.0" },
   "result": "success"
 }
 ```

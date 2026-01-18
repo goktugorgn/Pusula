@@ -23,7 +23,7 @@ Pusula requires authentication to protect DNS configuration. Key considerations:
 
 | Aspect             | Choice                     |
 | ------------------ | -------------------------- |
-| User count         | Single user (`goktugorgn`) |
+| User count         | Single user (`admin`) |
 | Credential storage | Local configuration file   |
 | Multi-user support | Not implemented            |
 

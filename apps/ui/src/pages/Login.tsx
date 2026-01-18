@@ -1,7 +1,7 @@
 /**
  * Login Page
  * 
- * Design Decision: Username is fixed to 'goktugorgn' (displayed but not editable).
+ * Design Decision: Username is fixed to 'admin' (displayed but not editable).
  * This matches the single-user design of the Pusula system where only the admin
  * user can authenticate. The username field is shown for clarity but disabled.
  */
@@ -14,7 +14,7 @@ import { ApiError } from '../api/client';
 import { GlassCard, Button, Badge } from '../components/ui';
 
 // Fixed admin username
-const ADMIN_USERNAME = 'goktugorgn';
+const ADMIN_USERNAME = 'admin';
 
 export default function LoginPage() {
   const { login, isLoading, isAuthenticated } = useAuth();
