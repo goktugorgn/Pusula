@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pi-hole Integration**: Read-only summary with graceful fallback
 - **137+ Unit Tests**: Comprehensive coverage across all modules
 
+- **Systemd Unit Files**: Production-ready service definitions
+  - `unbound-ui-backend.service` with security hardening
+  - `unbound-ui-doh-proxy.service` (optional, disabled by default)
+
 - **Frontend UI** (React + Vite + TanStack Query)
 - **Login Page**: Fixed username, password input, lockout/rate-limit countdown
 - **Dashboard**: Live status/stats polling (3s), mini charts, quick actions

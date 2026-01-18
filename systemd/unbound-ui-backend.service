@@ -1,6 +1,23 @@
+# =============================================================================
+# Pusula DNS Management Backend - systemd unit file
+# =============================================================================
+#
+# Installation:
+#   sudo cp unbound-ui-backend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable unbound-ui-backend
+#   sudo systemctl start unbound-ui-backend
+#
+# Prerequisites:
+#   - User 'unbound-ui' created (useradd -r -s /usr/sbin/nologin unbound-ui)
+#   - /etc/unbound-ui/unbound-ui.env exists with JWT_SECRET
+#   - /opt/pusula/backend installed with npm install
+#
+# =============================================================================
+
 [Unit]
 Description=Pusula DNS Management Backend
-Documentation=https://github.com/yourusername/pusula
+Documentation=https://github.com/goktugorgn/pusula
 After=network.target unbound.service
 Wants=unbound.service
 
@@ -12,21 +29,25 @@ WorkingDirectory=/opt/pusula/backend
 
 # Environment
 Environment=NODE_ENV=production
-EnvironmentFile=/opt/pusula/backend/.env
+EnvironmentFile=/etc/unbound-ui/unbound-ui.env
 
-# Run the application
-ExecStart=/usr/bin/node /opt/pusula/backend/dist/index.js
+# Start command
+ExecStart=/usr/bin/node dist/server.js
 
 # Restart policy
-Restart=always
+Restart=on-failure
 RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=60
 
 # Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=unbound-ui
 
-# Security hardening
+# =============================================================================
+# Security Hardening
+# =============================================================================
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -34,17 +55,19 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
+ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
-# Allow writes to specific directories
+# File access (explicit allow list)
 ReadWritePaths=/var/lib/unbound-ui
 ReadWritePaths=/var/log/unbound-ui
 ReadWritePaths=/etc/unbound/unbound-ui-managed.conf
 
-# Allow access to unbound control
-SupplementaryGroups=unbound systemd-journal
+# Group access for unbound control and log reading
+SupplementaryGroups=unbound adm
 
 [Install]
 WantedBy=multi-user.target

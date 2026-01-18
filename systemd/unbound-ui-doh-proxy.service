@@ -1,27 +1,63 @@
+# =============================================================================
+# DNS-over-HTTPS Proxy for Pusula (Optional)
+# =============================================================================
+#
+# This service is DISABLED BY DEFAULT.
+# Enable only when DoH mode is selected in Pusula upstream configuration.
+#
+# Installation:
+#   sudo cp unbound-ui-doh-proxy.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#
+# To enable DoH mode:
+#   sudo systemctl enable unbound-ui-doh-proxy
+#   sudo systemctl start unbound-ui-doh-proxy
+#
+# Prerequisites:
+#   - cloudflared installed at /usr/local/bin/cloudflared
+#   - Or dnscrypt-proxy (update ExecStart accordingly)
+#
+# =============================================================================
+
 [Unit]
-Description=Cloudflared DoH Proxy for Pusula
+Description=DNS-over-HTTPS Proxy for Pusula
 Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
 After=network.target
 
+# Only start if cloudflared exists
+ConditionPathExists=/usr/local/bin/cloudflared
+
 [Service]
 Type=simple
-User=cloudflared
+User=unbound-ui
+Group=unbound-ui
+
+# Default: Cloudflare DoH on port 5053
 ExecStart=/usr/local/bin/cloudflared proxy-dns --port 5053 --upstream https://cloudflare-dns.com/dns-query
 
 # Restart policy
-Restart=always
+Restart=on-failure
 RestartSec=5
 
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=cloudflared-doh
+SyslogIdentifier=unbound-ui-doh
 
-# Security
+# =============================================================================
+# Security Hardening
+# =============================================================================
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 [Install]
 WantedBy=multi-user.target
