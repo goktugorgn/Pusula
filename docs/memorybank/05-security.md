@@ -80,6 +80,46 @@ const ALLOWED_COMMANDS = {
 > [!IMPORTANT]
 > No user input is interpolated into commands. All operations use fixed command strings or controlled parameters.
 
+### Sudoers Configuration (Least-Privilege)
+
+The `unbound-ui` service user has **minimal** sudo access via a drop-in file:
+
+```bash
+# /etc/sudoers.d/unbound-ui
+# Installation: sudo cp system/sudoers-unbound-ui /etc/sudoers.d/unbound-ui
+
+# Unbound control commands
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control status
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control stats_noreset
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control reload
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_zone *
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_requestlist
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-checkconf
+
+# Systemctl (Unbound only)
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl is-active unbound
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl status unbound
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl reload unbound
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl restart unbound
+
+# Journalctl (read-only)
+unbound-ui ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u unbound *
+```
+
+**Backend invocation:**
+
+All commands are executed with `sudo -n` (non-interactive mode):
+
+```typescript
+import { execSync } from "child_process";
+
+// Example: run unbound-control with sudo
+const result = execSync("sudo -n /usr/sbin/unbound-control status");
+```
+
+> [!WARNING]
+> Never grant broad sudo access. Each command is explicit and auditable.
+
 ### File Operations
 
 | Operation | Restriction                                       |

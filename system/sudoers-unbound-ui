@@ -1,0 +1,73 @@
+# =============================================================================
+# Pusula DNS Management - Sudoers Drop-in File
+# =============================================================================
+#
+# Installation:
+#   sudo cp sudoers-unbound-ui /etc/sudoers.d/unbound-ui
+#   sudo chmod 440 /etc/sudoers.d/unbound-ui
+#   sudo visudo -c  # Validate syntax
+#
+# Purpose:
+#   Grant the 'unbound-ui' service user minimal, specific permissions to:
+#   - Control Unbound DNS resolver via unbound-control
+#   - Read Unbound logs via journalctl
+#   - Reload/restart Unbound service via systemctl
+#   - (Optional) Control DoH proxy service
+#
+# Security:
+#   - NOPASSWD: Required for non-interactive service operation
+#   - No shell access for unbound-ui user
+#   - Commands are explicit - no wildcards except where safe
+#
+# Backend Usage:
+#   Commands are invoked with: sudo -n <command>
+#   The -n flag prevents password prompts (fails if password required)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Unbound Control Commands
+# -----------------------------------------------------------------------------
+# Status and statistics (read-only)
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control status
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control stats_noreset
+
+# Configuration reload (non-destructive)
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control reload
+
+# Cache flush operations
+# - flush_zone: Clear cache for a specific zone (accepts zone argument)
+# - flush_requestlist: Clear pending requests
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_zone *
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_requestlist
+
+# Configuration validation
+unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-checkconf
+
+# -----------------------------------------------------------------------------
+# Systemctl - Unbound Service Management
+# -----------------------------------------------------------------------------
+# Status checks (read-only)
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl is-active unbound
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl status unbound
+
+# Service control (restart/reload)
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl reload unbound
+unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl restart unbound
+
+# -----------------------------------------------------------------------------
+# Journalctl - Log Access (Read-Only)
+# -----------------------------------------------------------------------------
+# Read Unbound service logs
+# Using wildcard for options like -n, --since, -f
+unbound-ui ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u unbound *
+
+# -----------------------------------------------------------------------------
+# Optional: DoH Proxy Service Management
+# -----------------------------------------------------------------------------
+# Uncomment if using cloudflared or dnscrypt-proxy
+# unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl is-active unbound-ui-doh-proxy
+# unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl status unbound-ui-doh-proxy
+# unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl start unbound-ui-doh-proxy
+# unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl stop unbound-ui-doh-proxy
+# unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl restart unbound-ui-doh-proxy

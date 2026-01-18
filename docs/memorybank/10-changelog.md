@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Systemd Unit Files**: Production-ready service definitions
   - `unbound-ui-backend.service` with security hardening
   - `unbound-ui-doh-proxy.service` (optional, disabled by default)
+- **Sudoers Drop-in**: Least-privilege `system/sudoers-unbound-ui` for unbound-control, systemctl, journalctl
 
 - **Frontend UI** (React + Vite + TanStack Query)
 - **Login Page**: Fixed username, password input, lockout/rate-limit countdown
