@@ -4,6 +4,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AppShell from './components/AppShell';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
+import UpstreamsPage from './pages/Upstreams';
+import SelfTestPage from './pages/SelfTest';
+import AlertsPage from './pages/Alerts';
+import SettingsPage from './pages/Settings';
+import LogsPage from './pages/Logs';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -15,40 +20,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Placeholder pages for now
-function SettingsPage() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
-      <div className="glass p-6">
-        <p className="text-white/70">Settings page coming soon...</p>
-      </div>
-    </div>
-  );
-}
-
-function LogsPage() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-white mb-6">Logs</h1>
-      <div className="glass p-6">
-        <p className="text-white/70">Logs page coming soon...</p>
-      </div>
-    </div>
-  );
-}
-
-function AlertsPage() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-white mb-6">Alerts</h1>
-      <div className="glass p-6">
-        <p className="text-white/70">Alerts page coming soon...</p>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   return (
@@ -62,9 +33,12 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/upstreams" element={<UpstreamsPage />} />
+              <Route path="/self-test" element={<SelfTestPage />} />
+              <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/logs" element={<LogsPage />} />
-              <Route path="/alerts" element={<AlertsPage />} />
             </Route>
           </Route>
         </Routes>

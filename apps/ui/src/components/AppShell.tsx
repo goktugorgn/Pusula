@@ -17,9 +17,11 @@ export default function AppShell() {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
-    { path: '/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/upstreams', label: 'Upstreams', icon: '🌐' },
+    { path: '/self-test', label: 'Self-Test', icon: '🔍' },
     { path: '/logs', label: 'Logs', icon: '📋' },
     { path: '/alerts', label: 'Alerts', icon: '🔔' },
+    { path: '/settings', label: 'Settings', icon: '⚙️' },
   ];
 
   return (
@@ -35,6 +37,7 @@ export default function AppShell() {
             <NavLink
               key={path}
               to={path}
+              end={path === '/'}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive
