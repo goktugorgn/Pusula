@@ -139,15 +139,86 @@ sudo systemctl restart pusula
 
 ```bash
 # Check logs
-sudo journalctl -u pusula -n 100
+sudo journalctl -u unbound-ui-backend -n 100
 
 # Common issues:
 # - Port already in use: lsof -i :3000
-# - Config error: Check /opt/pusula/config/pusula.yaml
+# - Config error: Check /etc/unbound-ui/config.yaml
 # - Permission error: Check file ownership
 
-# Validate config
-node /opt/pusula/backend/scripts/validate-config.js
+# Validate config syntax
+cat /etc/unbound-ui/config.yaml | head -20
+```
+
+### Permission Denied (sudo -n)
+
+```bash
+# Symptom: Backend can't run unbound-control
+# Check sudoers file exists
+ls -la /etc/sudoers.d/unbound-ui
+
+# Validate sudoers syntax
+sudo visudo -c -f /etc/sudoers.d/unbound-ui
+
+# Test sudo access as unbound-ui
+sudo -u unbound-ui sudo -n /usr/sbin/unbound-control status
+
+# If fails, reinstall sudoers:
+sudo cp /opt/pusula/../system/sudoers-unbound-ui /etc/sudoers.d/unbound-ui
+sudo chmod 440 /etc/sudoers.d/unbound-ui
+```
+
+### Unbound-Control Certificate Errors
+
+```bash
+# Symptom: "SSL handshake failed" or "connection refused"
+
+# Check if unbound-control is enabled
+grep -A 3 "remote-control:" /etc/unbound/unbound.conf
+
+# Should have:
+# remote-control:
+#   control-enable: yes
+#   control-interface: 127.0.0.1
+
+# Regenerate control keys if needed
+sudo unbound-control-setup
+sudo systemctl restart unbound
+
+# Test
+sudo unbound-control status
+```
+
+### Port 3000 Already in Use
+
+```bash
+# Find what's using port 3000
+sudo lsof -i :3000
+# or
+sudo ss -tlnp | grep :3000
+
+# Kill the process (if appropriate)
+sudo kill <PID>
+
+# Or change Pusula port in config
+sudo nano /etc/unbound-ui/config.yaml
+# Change: port: 3001
+
+sudo systemctl restart unbound-ui-backend
+```
+
+### Node.js Version Too Old
+
+```bash
+# Check version
+node --version  # Should be v18+
+
+# Upgrade via NodeSource
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
+sudo apt-get install -y nodejs
+
+# Verify
+node --version
 ```
 
 ---
@@ -209,16 +280,17 @@ sudo systemctl restart unbound pusula
 ### Password Reset
 
 ```bash
-# Generate new password hash
-node -e "const argon2=require('argon2'); \
-  argon2.hash('newpassword').then(console.log)"
+# Generate new password hash using bcrypt
+NEW_PASSWORD="your-new-password"
+node -e "const bcrypt=require('bcrypt'); \
+  console.log(bcrypt.hashSync('$NEW_PASSWORD', 12))"
 
-# Update config
-sudo nano /opt/pusula/config/pusula.yaml
+# Update credentials file
+sudo nano /etc/unbound-ui/credentials.json
 # Replace passwordHash value
 
 # Restart backend
-sudo systemctl restart pusula
+sudo systemctl restart unbound-ui-backend
 ```
 
 ---
