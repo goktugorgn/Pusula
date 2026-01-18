@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Migrated password hashing from Argon2id to bcrypt for broader compatibility
+- Optimized animations for Pi (reduced-motion support, lighter transforms)
+- Custom scrollbar styling for dark theme
 
 ### Security
 
