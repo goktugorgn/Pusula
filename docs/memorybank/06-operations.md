@@ -48,12 +48,14 @@ sudo ./scripts/install.sh
 
 ```
 /opt/pusula/
-├── backend/            # Node.js backend (755 root:root)
-│   ├── src/
-│   ├── dist/
-│   └── package.json
-└── ui/                 # Static frontend (755 root:root)
-    └── dist/
+├── apps/
+│   ├── backend/        # Node.js backend (755 root:root)
+│   │   ├── dist/       # Compiled TypeScript
+│   │   └── package.json
+│   └── ui/
+│       └── dist/       # Built React app
+├── scripts/            # Installer, CLI
+└── systemd/            # Service files
 ```
 
 ### Data: /var/lib/unbound-ui/

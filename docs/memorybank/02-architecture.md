@@ -172,35 +172,38 @@ UI → Backend → [Snapshot] → [Validate] → [Apply] → [Self-Test]
 ## File Structure
 
 ```
-/opt/pusula/                       # Or: project root
-├── backend/                       # Node.js application
-│   ├── src/
-│   │   ├── index.ts               # Entry point
-│   │   ├── server.ts              # Fastify server setup
-│   │   ├── config/                # Configuration
-│   │   ├── routes/                # API route handlers
-│   │   ├── services/              # Business logic
-│   │   ├── security/              # Auth, rate limit, audit
-│   │   └── utils/                 # SafeExec, errors
-│   ├── tests/
-│   ├── package.json
-│   └── .env
-├── frontend/                      # React build output
-│   └── dist/
-└── ...
+/opt/pusula/                       # Production install directory
+├── apps/
+│   ├── backend/                   # Node.js application
+│   │   ├── src/
+│   │   ├── dist/                  # Compiled TypeScript
+│   │   ├── package.json
+│   │   └── node_modules/
+│   └── ui/
+│       └── dist/                  # Built React app (served by backend)
+├── scripts/                       # Installer, CLI
+├── systemd/                       # Service unit files
+└── system/                        # Config templates, sudoers
 
 # System paths (Raspberry Pi)
 /etc/unbound-ui/
-├── config.yaml                    # Application config
-└── credentials.json               # Password hash
+├── config.yaml                    # Application config (640 root:unbound-ui)
+├── credentials.json               # Password hash (600 unbound-ui:unbound-ui)
+└── unbound-ui.env                 # Environment variables (640 root:unbound-ui)
 
 /var/lib/unbound-ui/
 ├── upstream.json                  # Upstream configuration
+├── alerts.json                    # Persisted alerts
 └── backups/                       # Configuration snapshots
 
 /var/log/unbound-ui/
 └── audit.log                      # Audit log
+
+/usr/local/bin/pusula              # CLI management wrapper
 ```
+
+> [!NOTE]
+> The backend serves the UI static files via `@fastify/static`. In production, UI is at `/opt/pusula/apps/ui/dist/`.
 
 ### Unbound Configuration
 

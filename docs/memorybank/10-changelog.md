@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation**:
   - Fixed install URL in `06-operations.md` (was pointing to wrong repo path)
   - Corrected GitHub repository URLs throughout docs
+  - Updated file structure in SSOT to match actual `apps/backend`, `apps/ui` layout
+
+- **Path Alignment**:
+  - Fixed `server.ts` static UI path from `frontend/dist` to `ui/dist`
+  - Fixed systemd `WorkingDirectory` to `/opt/pusula/apps/backend`
 
 ---
 

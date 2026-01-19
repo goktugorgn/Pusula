@@ -77,7 +77,9 @@ export async function buildServer() {
   });
 
   // Serve static files (frontend) if available
-  const frontendPath = join(__dirname, '../../frontend/dist');
+  // In production, UI is at /opt/pusula/apps/ui/dist
+  // This path is relative to /opt/pusula/apps/backend/dist/
+  const frontendPath = process.env.UI_STATIC_PATH || join(__dirname, '../../ui/dist');
   if (existsSync(frontendPath)) {
     await fastify.register(fastifyStatic, {
       root: frontendPath,

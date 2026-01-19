@@ -11,7 +11,7 @@
 # Prerequisites:
 #   - User 'unbound-ui' created (useradd -r -s /usr/sbin/nologin unbound-ui)
 #   - /etc/unbound-ui/unbound-ui.env exists with JWT_SECRET
-#   - /opt/pusula/backend installed with npm install
+#   - /opt/pusula/apps/backend installed with npm install
 #
 # =============================================================================
 
@@ -25,7 +25,7 @@ Wants=unbound.service
 Type=simple
 User=unbound-ui
 Group=unbound-ui
-WorkingDirectory=/opt/pusula/backend
+WorkingDirectory=/opt/pusula/apps/backend
 
 # Environment
 Environment=NODE_ENV=production
