@@ -60,6 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Installer**: Fixed SIGPIPE crash in JWT generation
   - **Uninstall**: Added cleanup for managed config file
 
+- **Node.js Auto-Fix (2026-01-19)**:
+  - Installer now **automatically removes** Node.js v23+ and installs v20 LTS
+  - Added `fix_nodejs_version()` function: stops Pusula, purges nodejs, cleans NodeSource repos
+  - Added `install_nodejs_20()` function: fetches NodeSource setup_20.x script
+  - Cleaner dependency handling with before/after version logging
+
 ---
 
 ## [1.0.0] - 2026-01-18

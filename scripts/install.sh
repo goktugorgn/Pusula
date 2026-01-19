@@ -150,26 +150,98 @@ install_dependencies() {
         jq \
         || log_error "Failed to install essential packages"
     
-    # Install Node.js 20 LTS via NodeSource (NOT lts.x which may be v24+)
-    if ! command -v node &> /dev/null; then
-        log_info "Installing Node.js 20 LTS..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt-get install -y -qq nodejs
-    else
+    # Check if Node.js needs to be fixed (v23+ is not compatible)
+    if command -v node &> /dev/null; then
         NODE_VERSION=$(node --version)
-        log_info "Node.js already installed: $NODE_VERSION"
+        NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1 | tr -d 'v')
+        
+        if [[ $NODE_MAJOR -ge 23 ]]; then
+            log_warn "Detected Node.js $NODE_VERSION (v23+ has compatibility issues)"
+            log_info "Automatically fixing Node.js version..."
+            fix_nodejs_version
+        elif [[ $NODE_MAJOR -lt 18 ]]; then
+            log_warn "Detected Node.js $NODE_VERSION (too old)"
+            log_info "Automatically upgrading Node.js..."
+            fix_nodejs_version
+        else
+            log_info "Node.js already installed: $NODE_VERSION (compatible)"
+        fi
+    else
+        log_info "Node.js not installed, installing Node.js 20 LTS..."
+        install_nodejs_20
     fi
     
-    # Verify Node.js version (must be 18-22, not 23+)
+    # Final verification
     NODE_MAJOR=$(node --version | cut -d'.' -f1 | tr -d 'v')
-    if [[ $NODE_MAJOR -lt 18 ]]; then
-        log_error "Node.js 18+ required. Found: $(node --version)"
-    fi
-    if [[ $NODE_MAJOR -ge 23 ]]; then
-        log_error "Node.js 22 or lower required (v23+ has compatibility issues). Found: $(node --version)"
+    if [[ $NODE_MAJOR -lt 18 ]] || [[ $NODE_MAJOR -ge 23 ]]; then
+        log_error "Node.js version fix failed. Found: $(node --version). Required: v18-v22."
     fi
     
-    log_success "Dependencies installed"
+    log_success "Dependencies installed (Node.js $(node --version))"
+}
+
+# -----------------------------------------------------------------------------
+# Fix Node.js Version (remove incompatible, install v20 LTS)
+# -----------------------------------------------------------------------------
+fix_nodejs_version() {
+    local NODE_BEFORE
+    NODE_BEFORE=$(node --version 2>/dev/null || echo "not installed")
+    log_info "Node.js version BEFORE: $NODE_BEFORE"
+    
+    # Step 1: Stop Pusula service if running (prevent conflicts)
+    if systemctl is-active --quiet pusula 2>/dev/null; then
+        log_info "Stopping pusula service during Node.js upgrade..."
+        systemctl stop pusula || true
+    fi
+    
+    # Step 2: Remove current Node.js
+    log_info "Removing current Node.js installation..."
+    apt-get purge -y nodejs 2>/dev/null || true
+    apt-get autoremove -y 2>/dev/null || true
+    hash -r 2>/dev/null || true
+    
+    # Step 3: Remove NodeSource repo files (to avoid reinstalling old version)
+    log_info "Cleaning up NodeSource repository files..."
+    rm -f /etc/apt/sources.list.d/nodesource.list 2>/dev/null || true
+    rm -f /etc/apt/sources.list.d/nodesource.list.save 2>/dev/null || true
+    rm -f /usr/share/keyrings/nodesource.gpg 2>/dev/null || true
+    
+    # Step 4: Install Node.js 20 LTS
+    install_nodejs_20
+    
+    # Step 5: Verify
+    local NODE_AFTER
+    NODE_AFTER=$(node --version 2>/dev/null || echo "FAILED")
+    log_info "Node.js version AFTER: $NODE_AFTER"
+    
+    local MAJOR_AFTER
+    MAJOR_AFTER=$(echo "$NODE_AFTER" | cut -d'.' -f1 | tr -d 'v')
+    if [[ "$MAJOR_AFTER" != "20" ]]; then
+        log_error "Node.js version fix failed! Expected v20.x.x, got: $NODE_AFTER"
+    fi
+    
+    log_success "Node.js fixed: $NODE_BEFORE → $NODE_AFTER"
+}
+
+# -----------------------------------------------------------------------------
+# Install Node.js 20 LTS from NodeSource
+# -----------------------------------------------------------------------------
+install_nodejs_20() {
+    log_info "Installing Node.js 20 LTS from NodeSource..."
+    
+    # Fetch and run NodeSource setup script
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    
+    # Update and install
+    apt-get update -qq
+    apt-get install -y -qq nodejs
+    
+    # Verify installation
+    if ! command -v node &> /dev/null; then
+        log_error "Node.js installation failed"
+    fi
+    
+    log_success "Node.js 20 LTS installed: $(node --version)"
 }
 
 # -----------------------------------------------------------------------------
