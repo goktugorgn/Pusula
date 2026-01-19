@@ -47,8 +47,8 @@ SyslogIdentifier=pusula
 
 # =============================================================================
 # Security Hardening
+# Note: NoNewPrivileges/RestrictSUIDSGID disabled to allow sudo
 # =============================================================================
-NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
@@ -58,7 +58,6 @@ ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
 RestrictRealtime=true
-RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # File access (explicit allow list)

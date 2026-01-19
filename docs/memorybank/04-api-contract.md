@@ -65,11 +65,12 @@ Default: `https://192.168.1.x:3000/api`
 
 ### Configuration
 
-| Method | Endpoint     | Description                   |
-| ------ | ------------ | ----------------------------- |
-| `GET`  | `/upstream`  | Get upstream configuration    |
-| `PUT`  | `/upstream`  | Update upstream configuration |
-| `POST` | `/self-test` | Run self-test sequence        |
+| Method | Endpoint          | Description                      |
+| ------ | ----------------- | -------------------------------- |
+| `GET`  | `/upstream`       | Get upstream configuration       |
+| `PUT`  | `/upstream`       | Update upstream configuration    |
+| `POST` | `/self-test`      | Run self-test sequence           |
+| `GET`  | `/self-test/last` | Get result of last run self-test |
 
 ### Alerts
 

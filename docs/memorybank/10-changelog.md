@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Backend**: Updated all sudo commands (unbound-control, systemctl) to use absolute paths (`/usr/sbin/`, `/bin/`) to match sudoers spec and fix execution failures
   - **Backend**: Added missing `/api/self-test/last` endpoint to fix 404 error
   - **Installer**: Added `configure_unbound` step to automatically setup `unbound-control` (certs, config) and include managed config. Fixes 503 Service Unavailable errors.
+  - **Systemd**: Relaxed `NoNewPrivileges` and `RestrictSUIDSGID` in `pusula.service` to allow `sudo` execution for Unbound control.
   - **Installer**: Added global TypeScript installation (`npm install -g typescript`) to support manual rebuilds on Raspberry Pi
 
 ---

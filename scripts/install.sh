@@ -397,10 +397,11 @@ configure_unbound() {
     if [[ ! -f "/etc/unbound/unbound_control.key" ]]; then
         log_info "Generating Unbound control certificates..."
         unbound-control-setup &>/dev/null || true
-        # Fix permissions
-        chown unbound:unbound /etc/unbound/unbound_*.key /etc/unbound/unbound_*.pem 2>/dev/null || true
-        chmod 640 /etc/unbound/unbound_*.key /etc/unbound/unbound_*.pem 2>/dev/null || true
     fi
+    
+    # Always ensure correct permissions (unbound needs to read these)
+    chown unbound:unbound /etc/unbound/unbound_*.key /etc/unbound/unbound_*.pem 2>/dev/null || true
+    chmod 640 /etc/unbound/unbound_*.key /etc/unbound/unbound_*.pem 2>/dev/null || true
     
     # 2. Add Pusula Unbound Config (Enable Remote Control + Include Managed)
     if [[ -d "/etc/unbound/unbound.conf.d" ]]; then

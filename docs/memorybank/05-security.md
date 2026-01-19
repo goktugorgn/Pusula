@@ -122,11 +122,11 @@ spawn(actualCmd, actualArgs, { shell: false });
 
 ### File Operations
 
-| Operation | Restriction                                       |
-| --------- | ------------------------------------------------- |
-| Read      | Limited to `/etc/unbound/`, `/var/log/unbound/`   |
-| Write     | Limited to `/etc/unbound/unbound-ui-managed.conf` |
-| Backup    | Limited to `/var/lib/unbound-ui/backups/`         |
+| Operation | Restriction                                     |
+| --------- | ----------------------------------------------- |
+| Read      | Limited to `/etc/unbound/`, `/var/log/unbound/` |
+| Write     | Limited to `/etc/unbound/pusula-managed.conf`   |
+| Backup    | Limited to `/var/lib/pusula/backups/`           |
 
 ---
 
@@ -171,7 +171,7 @@ All state-changing actions are logged:
 ### Log Location
 
 ```
-/var/log/unbound-ui/audit.log   # Production
+/var/log/pusula/audit.log   # Production
 ./audit.log                     # Development
 ```
 
@@ -222,12 +222,12 @@ Rotation: Daily, 30 days retention.
 
 | Secret             | Storage                             |
 | ------------------ | ----------------------------------- |
-| User password hash | `/etc/unbound-ui/credentials.json`  |
+| User password hash | `/etc/pusula/credentials.json`      |
 | JWT signing key    | `JWT_SECRET` env var or config file |
 | Pi-hole API token  | Config file (optional)              |
 
 > [!WARNING]
-> Protect `/etc/unbound-ui/` with appropriate file permissions (600 or 640).
+> Protect `/etc/pusula/` with appropriate file permissions (600 or 640).
 
 ---
 
