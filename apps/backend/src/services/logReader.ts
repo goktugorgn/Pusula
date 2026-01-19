@@ -33,7 +33,7 @@ export interface LogQueryOptions {
   /** Max entries to return (default: 100) */
   limit?: number;
   /** Filter by level */
-  level?: 'error' | 'warn' | 'info';
+  level?: 'error' | 'warn' | 'info' | 'debug';
   /** ISO timestamp to start from */
   since?: string;
   /** Cursor from previous query for pagination */
