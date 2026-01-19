@@ -24,6 +24,7 @@
     "@fastify/jwt": "^7.2.4",
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/static": "^7.0.1",
+    "@types/node": "^20.11.0",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.1",
     "fastify": "^4.26.0",
@@ -34,7 +35,6 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
-    "@types/node": "^20.11.0",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
