@@ -84,6 +84,24 @@ export async function buildServer() {
     await fastify.register(fastifyStatic, {
       root: frontendPath,
       prefix: '/',
+      decorateReply: false, // Allow setNotFoundHandler to work
+    });
+
+    // SPA fallback: serve index.html for all non-API routes (client-side routing)
+    fastify.setNotFoundHandler((request, reply) => {
+      // Don't serve index.html for API routes
+      if (request.url.startsWith('/api')) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `Route ${request.method}:${request.url} not found`,
+          },
+        });
+      }
+
+      // Serve index.html for all other routes (React Router handles them)
+      return reply.sendFile('index.html');
     });
   }
 
