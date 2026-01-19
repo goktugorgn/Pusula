@@ -53,6 +53,19 @@ const TEST_DOMAINS = {
 const OBSERVATION_WINDOW_SECONDS = 10;
 
 // ============================================================================
+// STATE
+// ============================================================================
+
+let lastSelfTestResult: SelfTestResult | null = null;
+
+/**
+ * Get the result from the last run self-test
+ */
+export function getLastSelfTestResult(): SelfTestResult | null {
+  return lastSelfTestResult;
+}
+
+// ============================================================================
 // MAIN TEST RUNNER
 // ============================================================================
 
@@ -104,7 +117,7 @@ export async function runSelfTest(): Promise<SelfTestResult> {
     overallStatus = 'warn';
   }
 
-  return {
+  return lastSelfTestResult = {
     steps,
     summary: {
       status: overallStatus,

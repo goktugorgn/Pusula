@@ -11,7 +11,7 @@ import { validateBody } from '../security/validators.js';
 import { logConfigChange, logModeChange, logSelfTest } from '../security/auditLogger.js';
 import { loadUpstreamConfig, updateUpstreamRequestSchema } from '../config/index.js';
 import { applyConfig } from '../services/configManager.js';
-import { runSelfTest, runQuickTest } from '../services/selfTest.js';
+import { runSelfTest, runQuickTest, getLastSelfTestResult } from '../services/selfTest.js';
 
 export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
   // All routes require authentication
@@ -120,6 +120,29 @@ export async function upstreamRoutes(fastify: FastifyInstance): Promise<void> {
       steps: result.steps.map((s) => ({ name: s.name, status: s.status })),
       totalDurationMs: result.totalDurationMs,
     });
+
+    return {
+      success: true,
+      data: result,
+    };
+  });
+  
+  /**
+   * GET /api/self-test/last
+   * Returns result of the last run self-test (or 404 if none)
+   */
+  fastify.get('/self-test/last', async (_request: FastifyRequest, reply: FastifyReply) => {
+    const result = getLastSelfTestResult();
+    
+    if (!result) {
+      return reply.code(404).send({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'No self-test has been run recently',
+        },
+      });
+    }
 
     return {
       success: true,
