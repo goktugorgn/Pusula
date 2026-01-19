@@ -8,7 +8,7 @@ import { safeExec } from '../utils/safeExec.js';
 /** Structured log entry */
 export interface LogEntry {
   /** ISO timestamp */
-  ts: string;
+  timestamp: string;
   /** Log level: error, warn, info, debug */
   level: 'error' | 'warn' | 'info' | 'debug';
   /** Log message content */
@@ -62,7 +62,7 @@ export function parseJournalOutput(output: string): LogEntry[] {
       const cursor = json.__CURSOR || String(microTs);
 
       entries.push({
-        ts,
+        timestamp: ts,
         level: mapPriority(json.PRIORITY),
         message: json.MESSAGE || '',
         cursor,
@@ -157,7 +157,7 @@ export async function getLogs(
   }
 
   // Sort by timestamp (oldest first for consistent pagination)
-  entries.sort((a, b) => a.ts.localeCompare(b.ts));
+  entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
   // Apply limit
   const hasMore = entries.length > effectiveLimit;
