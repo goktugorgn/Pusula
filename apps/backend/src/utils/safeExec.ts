@@ -124,12 +124,14 @@ const ALLOWED_COMMANDS: Record<string, CommandDef> = {
     cmd: '/usr/sbin/unbound-checkconf',
     args: [],
     timeout: 10000,
+    allowNonZero: true, // checkconf returns non-zero on invalid config - we handle this
     sudo: true,
   },
   'unbound-checkconf-file': {
     cmd: '/usr/sbin/unbound-checkconf',
-    args: ['-f', '$FILE'],
+    args: ['$FILE'],
     timeout: 10000,
+    allowNonZero: true, // checkconf returns non-zero on invalid config - we handle this
     sudo: true,
   },
 
