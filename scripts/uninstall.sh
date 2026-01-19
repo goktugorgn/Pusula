@@ -232,6 +232,12 @@ remove_config() {
     
     # Old config cleanup
     rm -rf /etc/unbound-ui 2>/dev/null || true
+    
+    # Remove managed Unbound config
+    if [[ -f "/etc/unbound/pusula-managed.conf" ]]; then
+        rm -f "/etc/unbound/pusula-managed.conf"
+        log_success "Removed /etc/unbound/pusula-managed.conf"
+    fi
 }
 
 remove_data() {

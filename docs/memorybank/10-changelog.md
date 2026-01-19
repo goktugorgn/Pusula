@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed `server.ts` UI path (configurable via `UI_STATIC_PATH`)
   - Fixed systemd `WorkingDirectory` to new layout
 
+- **Production Hardening (2026-01-19)**:
+  - **Node.js**: Pin to v20 LTS (installer enforce, package.json engines) to prevent v23+ incompatibility
+  - **Build**: Fixed production build flow (`npm ci` -> `npm run build` -> `npm prune`) to ensure `dist/` exists
+  - **Systemd**: Fixed `NAMESPACE` error by creating managed config file
+  - **Installer**: Fixed SIGPIPE crash in JWT generation
+  - **Uninstall**: Added cleanup for managed config file
+
 ---
 
 ## [1.0.0] - 2026-01-18

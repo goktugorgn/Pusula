@@ -150,20 +150,23 @@ install_dependencies() {
         jq \
         || log_error "Failed to install essential packages"
     
-    # Install Node.js via NodeSource (LTS) if not present
+    # Install Node.js 20 LTS via NodeSource (NOT lts.x which may be v24+)
     if ! command -v node &> /dev/null; then
-        log_info "Installing Node.js LTS..."
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+        log_info "Installing Node.js 20 LTS..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
         apt-get install -y -qq nodejs
     else
         NODE_VERSION=$(node --version)
         log_info "Node.js already installed: $NODE_VERSION"
     fi
     
-    # Verify Node.js version
+    # Verify Node.js version (must be 18-22, not 23+)
     NODE_MAJOR=$(node --version | cut -d'.' -f1 | tr -d 'v')
     if [[ $NODE_MAJOR -lt 18 ]]; then
         log_error "Node.js 18+ required. Found: $(node --version)"
+    fi
+    if [[ $NODE_MAJOR -ge 23 ]]; then
+        log_error "Node.js 22 or lower required (v23+ has compatibility issues). Found: $(node --version)"
     fi
     
     log_success "Dependencies installed"
@@ -285,6 +288,22 @@ EOF
     else
         log_info "pusula.env already exists, preserving"
     fi
+    
+    # Create managed Unbound config file (required for systemd ReadWritePaths)
+    local MANAGED_CONF="/etc/unbound/pusula-managed.conf"
+    if [[ ! -f "$MANAGED_CONF" ]]; then
+        # Ensure /etc/unbound exists
+        mkdir -p /etc/unbound
+        touch "$MANAGED_CONF"
+        chown "$SERVICE_USER":unbound "$MANAGED_CONF"
+        chmod 664 "$MANAGED_CONF"
+        log_success "Created $MANAGED_CONF"
+    else
+        # Ensure correct ownership
+        chown "$SERVICE_USER":unbound "$MANAGED_CONF" 2>/dev/null || true
+        chmod 664 "$MANAGED_CONF" 2>/dev/null || true
+        log_info "Managed config already exists"
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -319,13 +338,18 @@ install_application() {
         cp -r "$SOURCE_DIR/docs" "$RELEASE_DIR/" 2>/dev/null || true
     fi
     
-    # Build backend
+    # Build backend (CRITICAL: must install devDeps for TypeScript, then prune after)
     log_info "Building backend..."
-    log_info "  → Installing backend dependencies..."
+    log_info "  → Installing backend dependencies (including devDeps for build)..."
     cd "$RELEASE_DIR/apps/backend"
-    npm ci --production 2>&1 || npm install --production 2>&1
+    npm ci 2>&1 || npm install 2>&1
     log_info "  → Compiling TypeScript..."
-    npm run build 2>&1 || log_warn "Backend build step failed (may not be required)"
+    npm run build 2>&1
+    if [[ ! -f "dist/index.js" ]]; then
+        log_error "Backend build failed: dist/index.js not created"
+    fi
+    log_info "  → Pruning devDependencies for production..."
+    npm prune --omit=dev 2>&1
     log_success "Backend built"
     
     # Build UI if not pre-built

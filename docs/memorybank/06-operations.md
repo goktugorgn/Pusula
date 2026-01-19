@@ -7,7 +7,7 @@
 | Component       | Version            | Notes                      |
 | --------------- | ------------------ | -------------------------- |
 | Raspberry Pi OS | 64-bit (Bookworm+) | Lite or Desktop            |
-| Node.js         | 18+ LTS            | Installed by installer     |
+| Node.js         | 20 LTS             | Enforced by installer      |
 | Unbound         | 1.17+              | Via apt                    |
 | unbound-control | Enabled            | Configured with local keys |
 
