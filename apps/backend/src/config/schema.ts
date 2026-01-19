@@ -20,7 +20,7 @@ export const rateLimitConfigSchema = z.object({
     .default({}),
   api: z
     .object({
-      max: z.number().int().positive().default(60),
+      max: z.number().int().positive().default(600),
       windowMs: z.number().int().positive().default(60000),
     })
     .default({}),
