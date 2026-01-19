@@ -85,49 +85,49 @@ const ALLOWED_COMMANDS: Record<string, CommandDef> = {
   // unbound-control commands (require sudo)
   // -------------------------------------------------------------------------
   'unbound-status': {
-    cmd: 'unbound-control',
+    cmd: '/usr/sbin/unbound-control',
     args: ['status'],
     timeout: 5000,
     sudo: true,
   },
   'unbound-stats': {
-    cmd: 'unbound-control',
+    cmd: '/usr/sbin/unbound-control',
     args: ['stats_noreset'],
     timeout: 5000,
     sudo: true,
   },
   'unbound-reload': {
-    cmd: 'unbound-control',
+    cmd: '/usr/sbin/unbound-control',
     args: ['reload'],
     timeout: 10000,
     sudo: true,
   },
   'unbound-flush-all': {
-    cmd: 'unbound-control',
+    cmd: '/usr/sbin/unbound-control',
     args: ['flush_zone', '.'],
     timeout: 5000,
     sudo: true,
   },
   'unbound-flush-zone': {
-    cmd: 'unbound-control',
+    cmd: '/usr/sbin/unbound-control',
     args: ['flush_zone', '$ZONE'],
     timeout: 5000,
     sudo: true,
   },
   'unbound-flush-request': {
-    cmd: 'unbound-control',
+    cmd: '/usr/sbin/unbound-control',
     args: ['flush', '$HOSTNAME'],
     timeout: 5000,
     sudo: true,
   },
   'unbound-checkconf': {
-    cmd: 'unbound-checkconf',
+    cmd: '/usr/sbin/unbound-checkconf',
     args: [],
     timeout: 10000,
     sudo: true,
   },
   'unbound-checkconf-file': {
-    cmd: 'unbound-checkconf',
+    cmd: '/usr/sbin/unbound-checkconf',
     args: ['-f', '$FILE'],
     timeout: 10000,
     sudo: true,
@@ -137,27 +137,27 @@ const ALLOWED_COMMANDS: Record<string, CommandDef> = {
   // systemctl commands (restricted to allowed services, require sudo)
   // -------------------------------------------------------------------------
   'systemctl-is-active': {
-    cmd: 'systemctl',
+    cmd: '/bin/systemctl',
     args: ['is-active', '$SERVICE'],
     timeout: 5000,
     allowNonZero: true, // is-active returns 3 for inactive
     sudo: true,
   },
   'systemctl-status': {
-    cmd: 'systemctl',
+    cmd: '/bin/systemctl',
     args: ['status', '$SERVICE', '--no-pager'],
     timeout: 5000,
     allowNonZero: true, // status returns non-zero for stopped services
     sudo: true,
   },
   'systemctl-reload': {
-    cmd: 'systemctl',
+    cmd: '/bin/systemctl',
     args: ['reload', '$SERVICE'],
     timeout: 15000,
     sudo: true,
   },
   'systemctl-restart': {
-    cmd: 'systemctl',
+    cmd: '/bin/systemctl',
     args: ['restart', '$SERVICE'],
     timeout: 30000,
     sudo: true,
@@ -167,13 +167,13 @@ const ALLOWED_COMMANDS: Record<string, CommandDef> = {
   // journalctl commands (read-only, require sudo)
   // -------------------------------------------------------------------------
   'journalctl-read': {
-    cmd: 'journalctl',
+    cmd: '/usr/bin/journalctl',
     args: ['-u', '$UNIT', '--no-pager', '-n', '$LINES', '-o', 'json'],
     timeout: 10000,
     sudo: true,
   },
   'journalctl-since': {
-    cmd: 'journalctl',
+    cmd: '/usr/bin/journalctl',
     args: ['-u', '$UNIT', '--no-pager', '--since', '$SINCE', '-o', 'json'],
     timeout: 10000,
     sudo: true,
