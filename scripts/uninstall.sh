@@ -162,6 +162,10 @@ remove_unit_files() {
     rm -f /etc/systemd/system/unbound-ui-backend.service 2>/dev/null || true
     rm -f /etc/systemd/system/unbound-ui-doh-proxy.service 2>/dev/null || true
     
+    # Aggressive wildcard cleanup (Manual match)
+    rm -f /etc/systemd/system/pusula* 2>/dev/null || true
+    rm -f /etc/systemd/system/unbound-ui* 2>/dev/null || true
+    
     if [[ $removed -gt 0 ]]; then
         systemctl daemon-reload
         systemctl reset-failed 2>/dev/null || true
@@ -181,6 +185,9 @@ remove_sudoers() {
     
     # Old naming cleanup
     rm -f /etc/sudoers.d/unbound-ui 2>/dev/null || true
+    
+    # Aggressive cleanup
+    rm -f /etc/sudoers.d/pusula 2>/dev/null || true
     
     # Validate sudoers remains valid
     if visudo -c &>/dev/null; then
