@@ -320,18 +320,24 @@ install_application() {
     
     # Build backend
     log_info "Building backend..."
+    log_info "  → Installing backend dependencies..."
     cd "$RELEASE_DIR/apps/backend"
-    npm ci --production --silent 2>/dev/null || npm install --production --silent
-    npm run build --silent 2>/dev/null || true
+    npm ci --production 2>&1 || npm install --production 2>&1
+    log_info "  → Compiling TypeScript..."
+    npm run build 2>&1 || log_warn "Backend build step failed (may not be required)"
+    log_success "Backend built"
     
     # Build UI if not pre-built
-    log_info "Building UI..."
+    log_info "Building UI (this may take 5-10 minutes on Raspberry Pi)..."
     if [[ -d "$RELEASE_DIR/apps/ui/dist" ]]; then
-        log_info "UI already built, skipping"
+        log_info "  → UI already built, skipping"
     elif [[ -d "$RELEASE_DIR/apps/ui" ]]; then
         cd "$RELEASE_DIR/apps/ui"
-        npm ci --silent 2>/dev/null || npm install --silent
-        npm run build --silent
+        log_info "  → Installing UI dependencies..."
+        npm ci 2>&1 || npm install 2>&1
+        log_info "  → Bundling UI assets (Vite)..."
+        npm run build 2>&1
+        log_success "UI built"
     fi
     
     # Update current symlink
@@ -347,11 +353,12 @@ install_application() {
     if [[ -n "$INITIAL_PASSWORD" && ! -f "$CONFIG_DIR/credentials.json" ]]; then
         log_info "Generating credentials..."
         cd "$CURRENT_DIR/apps/backend"
+        log_info "  → Hashing initial password with bcrypt..."
         
         PASSWORD_HASH=$(node -e "
             const bcrypt = require('bcrypt');
             console.log(bcrypt.hashSync('$INITIAL_PASSWORD', 12));
-        " 2>/dev/null) || PASSWORD_HASH=""
+        " 2>&1) || PASSWORD_HASH=""
         
         if [[ -n "$PASSWORD_HASH" ]]; then
             cat > "$CONFIG_DIR/credentials.json" << EOF
