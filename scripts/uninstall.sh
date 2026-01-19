@@ -218,13 +218,15 @@ remove_cli() {
     done
 
     # Also check for any pusula-* variants (e.g., pusula-cli)
-    for cli_path in /usr/local/bin/pusula-* /usr/bin/pusula-* /bin/pusula-* 2>/dev/null; do
+    shopt -s nullglob
+    for cli_path in /usr/local/bin/pusula-* /usr/bin/pusula-* /bin/pusula-*; do
         if [[ -f "$cli_path" ]] || [[ -L "$cli_path" ]]; then
             rm -f "$cli_path"
             log_success "Removed $cli_path"
             ((removed++))
         fi
     done
+    shopt -u nullglob
 
     if [[ $removed -eq 0 ]]; then
         log_info "CLI not found in any standard location"
