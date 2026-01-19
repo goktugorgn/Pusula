@@ -76,6 +76,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **UI**: Added connection status badge ("Connected" / "Degraded") to dashboard header
   - **Types**: Added `UnboundConnection` interface to frontend types
 
+- **Critical Fixes (2026-01-19)**:
+  - **Uninstall Purge**: Now removes CLI from all locations (`/usr/local/bin`, `/usr/bin`, `/bin`, `/usr/local/sbin`)
+  - **Uninstall Purge**: Added `systemctl reset-failed` after unit removal
+  - **Uninstall Purge**: Added temp file cleanup (`/tmp/pusula*`, `/var/tmp/pusula*`)
+  - **Uninstall Purge**: Added sudoers validation after removal
+  - **Uninstall Purge**: Added `scripts/uninstall-selfcheck.sh` verification script
+  - **Backend**: All privileged commands now execute with `sudo -n` (non-interactive)
+  - **Backend**: Fixed Unbound data not displaying - commands were missing sudo prefix
+
 ---
 
 ## [1.0.0] - 2026-01-18

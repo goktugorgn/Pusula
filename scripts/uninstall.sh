@@ -164,6 +164,7 @@ remove_unit_files() {
     
     if [[ $removed -gt 0 ]]; then
         systemctl daemon-reload
+        systemctl reset-failed 2>/dev/null || true
         log_success "Removed $removed unit file(s)"
     else
         log_info "No unit files found"
@@ -180,17 +181,53 @@ remove_sudoers() {
     
     # Old naming cleanup
     rm -f /etc/sudoers.d/unbound-ui 2>/dev/null || true
+    
+    # Validate sudoers remains valid
+    if visudo -c &>/dev/null; then
+        log_success "Sudoers validation passed"
+    else
+        log_warn "Sudoers may have issues - run: sudo visudo -c"
+    fi
 }
 
 remove_cli() {
-    log_info "Removing CLI..."
+    log_info "Removing CLI from all possible locations..."
     
-    if [[ -f "/usr/local/bin/pusula" ]]; then
-        rm -f "/usr/local/bin/pusula"
-        log_success "Removed /usr/local/bin/pusula"
-    else
-        log_info "CLI not found"
+    local CLI_PATHS=(
+        "/usr/local/bin/pusula"
+        "/usr/bin/pusula"
+        "/bin/pusula"
+        "/usr/local/sbin/pusula"
+    )
+    local removed=0
+    
+    for cli_path in "${CLI_PATHS[@]}"; do
+        if [[ -f "$cli_path" ]] || [[ -L "$cli_path" ]]; then
+            rm -f "$cli_path"
+            log_success "Removed $cli_path"
+            ((removed++))
+        fi
+    done
+    
+    if [[ $removed -eq 0 ]]; then
+        log_info "CLI not found in any standard location"
     fi
+    
+    # Verify removal
+    if command -v pusula &>/dev/null; then
+        log_warn "CLI still found at: $(command -v pusula)"
+    else
+        log_success "CLI fully removed from PATH"
+    fi
+}
+
+remove_temp_files() {
+    log_info "Cleaning up temporary files..."
+    
+    rm -rf /tmp/pusula* 2>/dev/null || true
+    rm -rf /var/tmp/pusula* 2>/dev/null || true
+    
+    log_success "Temp files cleaned"
 }
 
 remove_user() {
@@ -310,6 +347,7 @@ main() {
     remove_unit_files
     remove_sudoers
     remove_cli
+    remove_temp_files
     remove_user
     remove_app_directory
     
@@ -326,7 +364,12 @@ main() {
     echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
     echo ""
     
-    if [[ "$PURGE" != "true" ]]; then
+    if [[ "$PURGE" == "true" ]]; then
+        echo -e "${GREEN}Purge completed. Verification:${NC}"
+        echo "  Run: command -v pusula     (should return nothing)"
+        echo "  Run: systemctl status pusula  (should show 'not found')"
+        echo ""
+    else
         echo "Preserved directories:"
         [[ -d "$CONFIG_DIR" ]] && echo "  - $CONFIG_DIR"
         [[ -d "$DATA_DIR" ]] && echo "  - $DATA_DIR"

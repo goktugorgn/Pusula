@@ -25,12 +25,12 @@ Pusula implements defense-in-depth with multiple security layers appropriate for
 
 ### Single-User Model
 
-| Aspect           | Details                     |
-| ---------------- | --------------------------- |
-| Username         | `admin` (configurable) |
-| Password storage | bcrypt hash (12 rounds)     |
-| Session          | JWT with httpOnly cookie    |
-| Token expiry     | 24 hours (configurable)     |
+| Aspect           | Details                  |
+| ---------------- | ------------------------ |
+| Username         | `admin` (configurable)   |
+| Password storage | bcrypt hash (12 rounds)  |
+| Session          | JWT with httpOnly cookie |
+| Token expiry     | 24 hours (configurable)  |
 
 ### Password Requirements
 
@@ -82,39 +82,39 @@ const ALLOWED_COMMANDS = {
 
 ### Sudoers Configuration (Least-Privilege)
 
-The `unbound-ui` service user has **minimal** sudo access via a drop-in file:
+The `pusula` service user has **minimal** sudo access via a drop-in file:
 
 ```bash
-# /etc/sudoers.d/unbound-ui
-# Installation: sudo cp system/sudoers-unbound-ui /etc/sudoers.d/unbound-ui
+# /etc/sudoers.d/pusula
+# Installed automatically by install.sh
 
 # Unbound control commands
-unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control status
-unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control stats_noreset
-unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control reload
-unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_zone *
-unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_requestlist
-unbound-ui ALL=(ALL) NOPASSWD: /usr/sbin/unbound-checkconf
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control status
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control stats_noreset
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control reload
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_zone *
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_requestlist
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-checkconf
 
 # Systemctl (Unbound only)
-unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl is-active unbound
-unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl status unbound
-unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl reload unbound
-unbound-ui ALL=(ALL) NOPASSWD: /bin/systemctl restart unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl is-active unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl status unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl reload unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl restart unbound
 
 # Journalctl (read-only)
-unbound-ui ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u unbound *
+pusula ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u unbound *
 ```
 
 **Backend invocation:**
 
-All commands are executed with `sudo -n` (non-interactive mode):
+The `safeExec` module automatically prefixes privileged commands with `sudo -n` (non-interactive mode):
 
 ```typescript
-import { execSync } from "child_process";
-
-// Example: run unbound-control with sudo
-const result = execSync("sudo -n /usr/sbin/unbound-control status");
+// safeExec.ts execution logic
+const actualCmd = def.sudo ? "sudo" : def.cmd;
+const actualArgs = def.sudo ? ["-n", def.cmd, ...args] : args;
+spawn(actualCmd, actualArgs, { shell: false });
 ```
 
 > [!WARNING]

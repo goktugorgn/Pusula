@@ -76,91 +76,107 @@ interface CommandDef {
   timeout?: number;
   /** If true, non-zero exit codes are allowed (returns as success with code) */
   allowNonZero?: boolean;
+  /** If true, command is executed with sudo -n (non-interactive) */
+  sudo?: boolean;
 }
 
 const ALLOWED_COMMANDS: Record<string, CommandDef> = {
   // -------------------------------------------------------------------------
-  // unbound-control commands
+  // unbound-control commands (require sudo)
   // -------------------------------------------------------------------------
   'unbound-status': {
     cmd: 'unbound-control',
     args: ['status'],
     timeout: 5000,
+    sudo: true,
   },
   'unbound-stats': {
     cmd: 'unbound-control',
     args: ['stats_noreset'],
     timeout: 5000,
+    sudo: true,
   },
   'unbound-reload': {
     cmd: 'unbound-control',
     args: ['reload'],
     timeout: 10000,
+    sudo: true,
   },
   'unbound-flush-all': {
     cmd: 'unbound-control',
     args: ['flush_zone', '.'],
     timeout: 5000,
+    sudo: true,
   },
   'unbound-flush-zone': {
     cmd: 'unbound-control',
     args: ['flush_zone', '$ZONE'],
     timeout: 5000,
+    sudo: true,
   },
   'unbound-flush-request': {
     cmd: 'unbound-control',
     args: ['flush', '$HOSTNAME'],
     timeout: 5000,
+    sudo: true,
   },
   'unbound-checkconf': {
     cmd: 'unbound-checkconf',
     args: [],
     timeout: 10000,
+    sudo: true,
   },
   'unbound-checkconf-file': {
     cmd: 'unbound-checkconf',
     args: ['-f', '$FILE'],
     timeout: 10000,
+    sudo: true,
   },
 
   // -------------------------------------------------------------------------
-  // systemctl commands (restricted to allowed services)
+  // systemctl commands (restricted to allowed services, require sudo)
   // -------------------------------------------------------------------------
   'systemctl-is-active': {
     cmd: 'systemctl',
     args: ['is-active', '$SERVICE'],
     timeout: 5000,
     allowNonZero: true, // is-active returns 3 for inactive
+    sudo: true,
   },
   'systemctl-status': {
     cmd: 'systemctl',
     args: ['status', '$SERVICE', '--no-pager'],
     timeout: 5000,
     allowNonZero: true, // status returns non-zero for stopped services
+    sudo: true,
   },
   'systemctl-reload': {
     cmd: 'systemctl',
     args: ['reload', '$SERVICE'],
     timeout: 15000,
+    sudo: true,
   },
   'systemctl-restart': {
     cmd: 'systemctl',
     args: ['restart', '$SERVICE'],
     timeout: 30000,
+    sudo: true,
   },
 
   // -------------------------------------------------------------------------
-  // journalctl commands (read-only)
+  // journalctl commands (read-only, require sudo)
   // -------------------------------------------------------------------------
   'journalctl-read': {
     cmd: 'journalctl',
     args: ['-u', '$UNIT', '--no-pager', '-n', '$LINES', '-o', 'json'],
     timeout: 10000,
+    sudo: true,
   },
   'journalctl-since': {
     cmd: 'journalctl',
     args: ['-u', '$UNIT', '--no-pager', '--since', '$SINCE', '-o', 'json'],
     timeout: 10000,
+    sudo: true,
   },
 };
 
@@ -326,8 +342,12 @@ export async function safeExec(
   });
 
   // Execute using spawn (NO SHELL!)
+  // If sudo flag is set, prefix command with sudo -n (non-interactive)
   return new Promise((resolve, reject) => {
-    const child = spawn(def.cmd, args, {
+    const actualCmd = def.sudo ? 'sudo' : def.cmd;
+    const actualArgs = def.sudo ? ['-n', def.cmd, ...args] : args;
+
+    const child = spawn(actualCmd, actualArgs, {
       shell: false,
       timeout: def.timeout || 10000,
       env: { ...process.env, LC_ALL: 'C' },

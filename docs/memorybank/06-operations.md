@@ -214,8 +214,10 @@ sudo ./scripts/uninstall.sh
 Removes:
 
 - Service and systemd units
-- CLI (`/usr/local/bin/pusula`)
+- CLI (`/usr/local/bin/pusula` and all other locations)
 - Application (`/opt/pusula/`)
+- Sudoers configuration
+- Temp files (`/tmp/pusula*`)
 
 Preserves:
 
@@ -225,10 +227,18 @@ Preserves:
 ### Full Purge
 
 ```bash
-sudo ./scripts/uninstall.sh --purge
+sudo ./scripts/uninstall.sh --purge --yes
 ```
 
-Removes everything including configuration and backups.
+Removes everything including configuration, backups, and logs.
+
+### Verify Complete Removal
+
+```bash
+sudo ./scripts/uninstall-selfcheck.sh
+```
+
+Checks all CLI locations, systemd units, directories, sudoers, and temp files.
 
 ---
 

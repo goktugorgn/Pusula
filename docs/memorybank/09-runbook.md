@@ -153,19 +153,18 @@ cat /etc/unbound-ui/config.yaml | head -20
 ### Permission Denied (sudo -n)
 
 ```bash
-# Symptom: Backend can't run unbound-control
+# Symptom: Backend can't run unbound-control / Dashboard shows empty data
 # Check sudoers file exists
-ls -la /etc/sudoers.d/unbound-ui
+ls -la /etc/sudoers.d/pusula
 
 # Validate sudoers syntax
-sudo visudo -c -f /etc/sudoers.d/unbound-ui
+sudo visudo -c -f /etc/sudoers.d/pusula
 
-# Test sudo access as unbound-ui
-sudo -u unbound-ui sudo -n /usr/sbin/unbound-control status
+# Test sudo access as pusula user
+sudo -u pusula sudo -n /usr/sbin/unbound-control status
 
-# If fails, reinstall sudoers:
-sudo cp /opt/pusula/../system/sudoers-unbound-ui /etc/sudoers.d/unbound-ui
-sudo chmod 440 /etc/sudoers.d/unbound-ui
+# If fails, re-run installer to reinstall sudoers:
+sudo ./scripts/install.sh --upgrade
 ```
 
 ### Unbound-Control Certificate Errors
