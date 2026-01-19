@@ -199,15 +199,16 @@ remove_sudoers() {
 
 remove_cli() {
     log_info "Removing CLI from all possible locations..."
-    
+
     local CLI_PATHS=(
         "/usr/local/bin/pusula"
         "/usr/bin/pusula"
         "/bin/pusula"
         "/usr/local/sbin/pusula"
+        "/sbin/pusula"
     )
     local removed=0
-    
+
     for cli_path in "${CLI_PATHS[@]}"; do
         if [[ -f "$cli_path" ]] || [[ -L "$cli_path" ]]; then
             rm -f "$cli_path"
@@ -215,11 +216,23 @@ remove_cli() {
             ((removed++))
         fi
     done
-    
+
+    # Also check for any pusula-* variants (e.g., pusula-cli)
+    for cli_path in /usr/local/bin/pusula-* /usr/bin/pusula-* /bin/pusula-* 2>/dev/null; do
+        if [[ -f "$cli_path" ]] || [[ -L "$cli_path" ]]; then
+            rm -f "$cli_path"
+            log_success "Removed $cli_path"
+            ((removed++))
+        fi
+    done
+
     if [[ $removed -eq 0 ]]; then
         log_info "CLI not found in any standard location"
     fi
-    
+
+    # Refresh shell command hash table
+    hash -r 2>/dev/null || true
+
     # Verify removal
     if command -v pusula &>/dev/null; then
         log_warn "CLI still found at: $(command -v pusula)"
@@ -238,18 +251,27 @@ remove_temp_files() {
 }
 
 remove_user() {
-    log_info "Removing system user..."
-    
+    log_info "Removing system user and group..."
+
     if id "$SERVICE_USER" &>/dev/null; then
         userdel -f "$SERVICE_USER" 2>/dev/null || true
         log_success "Removed user: $SERVICE_USER"
     else
         log_info "User $SERVICE_USER not found"
     fi
-    
+
+    # Remove group if it exists and has no members
+    if getent group "$SERVICE_USER" &>/dev/null; then
+        groupdel "$SERVICE_USER" 2>/dev/null || true
+        log_success "Removed group: $SERVICE_USER"
+    fi
+
     # Old user cleanup
     if id "unbound-ui" &>/dev/null; then
         userdel -f "unbound-ui" 2>/dev/null || true
+    fi
+    if getent group "unbound-ui" &>/dev/null; then
+        groupdel "unbound-ui" 2>/dev/null || true
     fi
 }
 
@@ -266,22 +288,41 @@ remove_app_directory() {
 
 remove_config() {
     log_info "Removing configuration..."
-    
+
     if [[ -d "$CONFIG_DIR" ]]; then
         rm -rf "$CONFIG_DIR"
         log_success "Removed $CONFIG_DIR"
     else
         log_info "$CONFIG_DIR not found"
     fi
-    
+
     # Old config cleanup
     rm -rf /etc/unbound-ui 2>/dev/null || true
-    
-    # Remove managed Unbound config
+
+    # Remove managed Unbound config files
     if [[ -f "/etc/unbound/pusula-managed.conf" ]]; then
         rm -f "/etc/unbound/pusula-managed.conf"
         log_success "Removed /etc/unbound/pusula-managed.conf"
     fi
+
+    # Remove installer-generated Unbound conf.d include file
+    if [[ -f "/etc/unbound/unbound.conf.d/99-pusula.conf" ]]; then
+        rm -f "/etc/unbound/unbound.conf.d/99-pusula.conf"
+        log_success "Removed /etc/unbound/unbound.conf.d/99-pusula.conf"
+        # Restart Unbound to apply config removal
+        if systemctl is-active --quiet unbound 2>/dev/null; then
+            systemctl reload unbound 2>/dev/null || true
+            log_info "Reloaded Unbound to apply config changes"
+        fi
+    fi
+
+    # Old naming variants
+    rm -f /etc/unbound/unbound.conf.d/99-unbound-ui.conf 2>/dev/null || true
+    rm -f /etc/unbound/unbound-ui-managed.conf 2>/dev/null || true
+
+    # Remove logrotate config if exists
+    rm -f /etc/logrotate.d/pusula 2>/dev/null || true
+    rm -f /etc/logrotate.d/unbound-ui 2>/dev/null || true
 }
 
 remove_data() {
