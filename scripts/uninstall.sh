@@ -184,6 +184,17 @@ remove_app_directory() {
     fi
 }
 
+remove_cli() {
+    log_info "Removing CLI..."
+    
+    if [[ -f "/usr/local/bin/pusula" ]]; then
+        rm -f "/usr/local/bin/pusula"
+        log_success "Removed /usr/local/bin/pusula"
+    else
+        log_info "CLI not found at /usr/local/bin/pusula"
+    fi
+}
+
 remove_config() {
     log_info "Removing configuration..."
     
@@ -257,6 +268,7 @@ main() {
     remove_sudoers
     remove_user
     remove_app_directory
+    remove_cli
     
     # Only remove data with --purge
     if [[ "$PURGE" == "true" ]]; then

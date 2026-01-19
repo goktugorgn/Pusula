@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-01-19
+
+### Added
+
+- **CLI Management Tool (`pusula` command)**:
+  - Added `scripts/pusula-cli.sh` - comprehensive CLI wrapper for service management
+  - Commands: `start`, `stop`, `restart`, `status`, `autostart on|off`, `logs [backend|unbound|proxy|audit]`
+  - Installed to `/usr/local/bin/pusula` during installation
+  - Added CLI Commands section to `06-operations.md`
+
+### Changed
+
+- **Installer Improvements (`scripts/install.sh`)**:
+  - Rewrote installer for remote install support via curl pipe
+  - Added idempotent upgrade mode detection
+  - Added CLI installation step
+  - Improved health check with retry logic
+  - Better output formatting with colored status
+
+- **Uninstaller Updates (`scripts/uninstall.sh`)**:
+  - Added CLI removal (`/usr/local/bin/pusula`)
+  - Default behavior preserves config/data, `--purge` removes all
+
+### Fixed
+
+- **Fastify Plugin Version Mismatch**:
+  - Downgraded `@fastify/jwt` from `8.0.1` to `^7.2.4` for Fastify 4 compatibility
+  - Resolved `FST_ERR_PLUGIN_VERSION_MISMATCH` error at runtime
+
+- **Documentation**:
+  - Fixed install URL in `06-operations.md` (was pointing to wrong repo path)
+  - Corrected GitHub repository URLs throughout docs
+
+---
+
 ## [1.0.0] - 2026-01-18
 
 ### Added

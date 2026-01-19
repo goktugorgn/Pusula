@@ -14,22 +14,22 @@
 ### One-Command Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/admin/pusula/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/scripts/install.sh | sudo bash
 ```
 
 ### Manual Installation
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/admin/pusula.git
+git clone https://github.com/goktugorgn/pusula.git
 cd pusula
 
 # 2. Run installer
 sudo ./scripts/install.sh
-
-# 3. Configure (interactive)
-sudo pusula-setup
 ```
+
+> [!TIP]
+> After installation, use the `pusula` CLI for service management. See [CLI Commands](#cli-commands) below.
 
 ---
 
@@ -176,6 +176,34 @@ sudo journalctl -u unbound-ui-backend -f
 sudo systemctl enable unbound-ui-doh-proxy
 sudo systemctl start unbound-ui-doh-proxy
 ```
+
+### CLI Commands
+
+The `pusula` CLI wrapper provides convenient commands for managing the service:
+
+```bash
+# Service management
+sudo pusula start         # Start the backend
+sudo pusula stop          # Stop the backend
+sudo pusula restart       # Restart the backend
+pusula status             # Show status of all services
+
+# Autostart management
+sudo pusula autostart on  # Enable autostart on boot
+sudo pusula autostart off # Disable autostart on boot
+
+# Log viewing (follow mode)
+pusula logs backend       # Backend logs
+pusula logs unbound       # Unbound DNS logs
+pusula logs proxy         # DoH proxy logs
+pusula logs audit         # Audit log
+
+# Help
+pusula help               # Show all commands
+```
+
+> [!NOTE]
+> The CLI is installed to `/usr/local/bin/pusula` during installation.
 
 ---
 
