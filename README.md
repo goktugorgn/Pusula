@@ -118,6 +118,31 @@ Projeyi macOS veya Linux üzerinde, Raspberry Pi olmadan geliştirmek için **DE
 
 ---
 
+## CLI Kullanımı
+
+Kurulumdan sonra `pusula` komutu ile servisi yönetebilirsiniz:
+
+```bash
+# Servis durumunu göster
+pusula status
+
+# API sağlık kontrolü
+pusula health
+
+# Logları takip et
+pusula logs backend
+
+# Servisi yeniden başlat
+sudo pusula restart
+
+# Otomatik başlatmayı etkinleştir
+sudo pusula autostart on
+```
+
+Tüm komutlar için: `pusula help`
+
+---
+
 ## Dokümantasyon
 
 Projenin teknik detayları `docs/memorybank` klasöründe "Single Source of Truth" (SSOT) olarak tutulmaktadır:

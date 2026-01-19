@@ -11,39 +11,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Production Packaging Overhaul**:
+  - New directory layout: `/opt/pusula/current/` symlink with `/releases/` for versioning
+  - New naming convention: `pusula` service user, `/etc/pusula/`, `/var/lib/pusula/`
+  - New systemd units: `pusula.service`, `pusula-doh-proxy.service`
+  - Added `systemd/README.md` documenting service units
+
 - **CLI Management Tool (`pusula` command)**:
-  - Added `scripts/pusula-cli.sh` - comprehensive CLI wrapper for service management
-  - Commands: `start`, `stop`, `restart`, `status`, `autostart on|off`, `logs [backend|unbound|proxy|audit]`
-  - Installed to `/usr/local/bin/pusula` during installation
-  - Added CLI Commands section to `06-operations.md`
+  - Commands: `start`, `stop`, `restart`, `status`, `autostart on|off`
+  - New: `health` - Check API health endpoint
+  - New: `version` - Show version and commit info
+  - New: `logs [backend|unbound|proxy|audit]`
+
+- **Developer Tools**:
+  - Added `npm run doctor` - Validates Fastify plugin version compatibility
+  - Added `scripts/postinstall-healthcheck.sh` for installation verification
+
+- **ADR-0005**: Fastify Version Lock decision documented
 
 ### Changed
 
-- **Installer Improvements (`scripts/install.sh`)**:
-  - Rewrote installer for remote install support via curl pipe
-  - Added idempotent upgrade mode detection
-  - Added CLI installation step
-  - Improved health check with retry logic
-  - Better output formatting with colored status
+- **Installer (`scripts/install.sh`)**:
+  - Complete rewrite for new layout
+  - Release-based deployment with symlinks
+  - Remote install via curl pipe
+  - Idempotent upgrade support
+  - New sudoers configuration for `pusula` user
 
-- **Uninstaller Updates (`scripts/uninstall.sh`)**:
-  - Added CLI removal (`/usr/local/bin/pusula`)
-  - Default behavior preserves config/data, `--purge` removes all
+- **Uninstaller (`scripts/uninstall.sh`)**:
+  - Supports `--yes` flag to skip confirmation
+  - Cleans up old `unbound-ui-*` naming
+  - Preserves config/data by default, `--purge` for full removal
 
 ### Fixed
 
 - **Fastify Plugin Version Mismatch**:
-  - Downgraded `@fastify/jwt` from `8.0.1` to `^7.2.4` for Fastify 4 compatibility
-  - Resolved `FST_ERR_PLUGIN_VERSION_MISMATCH` error at runtime
-
-- **Documentation**:
-  - Fixed install URL in `06-operations.md` (was pointing to wrong repo path)
-  - Corrected GitHub repository URLs throughout docs
-  - Updated file structure in SSOT to match actual `apps/backend`, `apps/ui` layout
+  - Locked `@fastify/jwt` to `^7.2.4` for Fastify 4 compatibility
+  - Added `npm run doctor` to prevent future mismatches
 
 - **Path Alignment**:
-  - Fixed `server.ts` static UI path from `frontend/dist` to `ui/dist`
-  - Fixed systemd `WorkingDirectory` to `/opt/pusula/apps/backend`
+  - Fixed `server.ts` UI path (configurable via `UI_STATIC_PATH`)
+  - Fixed systemd `WorkingDirectory` to new layout
 
 ---
 

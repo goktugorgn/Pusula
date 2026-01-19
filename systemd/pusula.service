@@ -1,0 +1,74 @@
+# =============================================================================
+# Pusula DNS Management Backend - systemd unit file
+# =============================================================================
+#
+# Installation:
+#   sudo cp pusula.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable pusula
+#   sudo systemctl start pusula
+#
+# Prerequisites:
+#   - User 'pusula' created (useradd -r -s /usr/sbin/nologin pusula)
+#   - /etc/pusula/pusula.env exists with JWT_SECRET
+#   - /opt/pusula/current/apps/backend installed with npm install
+#
+# =============================================================================
+
+[Unit]
+Description=Pusula DNS Management Backend
+Documentation=https://github.com/goktugorgn/Pusula
+After=network.target unbound.service
+Wants=unbound.service
+
+[Service]
+Type=simple
+User=pusula
+Group=pusula
+WorkingDirectory=/opt/pusula/current/apps/backend
+
+# Environment
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/pusula/pusula.env
+
+# Start command
+ExecStart=/usr/bin/node dist/index.js
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pusula
+
+# =============================================================================
+# Security Hardening
+# =============================================================================
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# File access (explicit allow list)
+ReadWritePaths=/etc/pusula
+ReadWritePaths=/var/log/pusula
+ReadWritePaths=/var/lib/pusula
+ReadWritePaths=/etc/unbound/pusula-managed.conf
+
+# Group access for unbound control and log reading
+SupplementaryGroups=unbound adm
+
+[Install]
+WantedBy=multi-user.target

@@ -16,7 +16,8 @@
 #   pusula status       - Show service status
 #   pusula autostart on|off - Enable/disable autostart
 #   pusula logs [backend|unbound|proxy] - View logs
-#   pusula update       - Self-update (placeholder)
+#   pusula health       - Check API health
+#   pusula version      - Show version info
 #   pusula help         - Show this help
 #
 # =============================================================================
@@ -26,9 +27,12 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
-BACKEND_SERVICE="unbound-ui-backend"
-DOH_SERVICE="unbound-ui-doh-proxy"
-VERSION="1.0.0"
+BACKEND_SERVICE="pusula"
+DOH_SERVICE="pusula-doh-proxy"
+INSTALL_DIR="/opt/pusula/current"
+CONFIG_DIR="/etc/pusula"
+VERSION="1.1.0"
+DEFAULT_PORT="${PUSULA_PORT:-3000}"
 
 # Colors
 RED='\033[0;31m'
@@ -140,18 +144,6 @@ cmd_status() {
     fi
     
     echo ""
-    
-    # Health check (only if backend is running)
-    if systemctl is-active --quiet "$BACKEND_SERVICE" 2>/dev/null; then
-        echo -n "  Health API:  "
-        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/api/health" 2>/dev/null | grep -q "200"; then
-            echo -e "${GREEN}healthy${NC}"
-        else
-            echo -e "${YELLOW}checking...${NC}"
-        fi
-    fi
-    
-    echo ""
 }
 
 cmd_autostart() {
@@ -199,10 +191,10 @@ cmd_logs() {
         audit|a)
             log_info "Showing audit log..."
             echo ""
-            if [[ -f /var/log/unbound-ui/audit.log ]]; then
-                sudo tail -n "$lines" -f /var/log/unbound-ui/audit.log
+            if [[ -f /var/log/pusula/audit.log ]]; then
+                sudo tail -n "$lines" -f /var/log/pusula/audit.log
             else
-                log_warn "Audit log not found at /var/log/unbound-ui/audit.log"
+                log_warn "Audit log not found at /var/log/pusula/audit.log"
             fi
             ;;
         *)
@@ -213,17 +205,73 @@ cmd_logs() {
     esac
 }
 
-cmd_update() {
-    log_warn "Self-update is not yet implemented."
+cmd_health() {
     echo ""
-    echo "To update Pusula manually:"
-    echo "  1. cd /opt/pusula"
-    echo "  2. sudo git pull origin main"
-    echo "  3. cd backend && sudo npm install --production"
-    echo "  4. sudo systemctl restart unbound-ui-backend"
+    echo -e "${CYAN}Checking Pusula health...${NC}"
     echo ""
-    echo "Or reinstall:"
-    echo "  curl -fsSL https://raw.githubusercontent.com/goktugorgun/pusula/main/scripts/install.sh | sudo bash"
+    
+    local port="$DEFAULT_PORT"
+    local url="http://localhost:$port/api/health"
+    
+    if ! command -v curl &> /dev/null; then
+        log_error "curl is required but not installed"
+        exit 1
+    fi
+    
+    local response
+    local http_code
+    
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null) || http_code="000"
+    
+    if [[ "$http_code" == "200" ]]; then
+        response=$(curl -s "$url" 2>/dev/null)
+        log_success "API is healthy"
+        echo ""
+        echo "  URL:      $url"
+        echo "  Status:   $http_code"
+        echo ""
+        if command -v jq &> /dev/null; then
+            echo "$response" | jq -r '.data // .'
+        else
+            echo "$response"
+        fi
+    else
+        log_error "API health check failed (HTTP $http_code)"
+        echo ""
+        echo "  URL:      $url"
+        echo "  Status:   $http_code"
+        echo ""
+        echo "Troubleshooting:"
+        echo "  - Check if service is running: pusula status"
+        echo "  - Check logs: pusula logs backend"
+        exit 1
+    fi
+    echo ""
+}
+
+cmd_version() {
+    echo ""
+    echo -e "${CYAN}Pusula${NC} DNS Management"
+    echo ""
+    echo "  CLI Version:  $VERSION"
+    
+    # Try to get backend version from package.json
+    if [[ -f "$INSTALL_DIR/apps/backend/package.json" ]]; then
+        local backend_version
+        backend_version=$(grep -o '"version": *"[^"]*"' "$INSTALL_DIR/apps/backend/package.json" | cut -d'"' -f4)
+        echo "  Backend:      $backend_version"
+    fi
+    
+    # Try to get git commit
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        local commit
+        commit=$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null) || commit="unknown"
+        echo "  Commit:       $commit"
+    fi
+    
+    echo ""
+    echo "  Install dir:  $INSTALL_DIR"
+    echo "  Config dir:   $CONFIG_DIR"
     echo ""
 }
 
@@ -241,20 +289,17 @@ cmd_help() {
     echo "  autostart on    Enable autostart on boot"
     echo "  autostart off   Disable autostart on boot"
     echo "  logs [target]   View logs (backend|unbound|proxy|audit)"
-    echo "  update          Self-update (placeholder)"
+    echo "  health          Check API health endpoint"
+    echo "  version         Show version information"
     echo "  help, -h        Show this help message"
-    echo "  version, -v     Show version"
     echo ""
     echo "Examples:"
     echo "  sudo pusula start"
     echo "  sudo pusula autostart on"
     echo "  pusula logs backend"
     echo "  pusula status"
+    echo "  pusula health"
     echo ""
-}
-
-cmd_version() {
-    echo "Pusula CLI v${VERSION}"
 }
 
 # -----------------------------------------------------------------------------
@@ -283,14 +328,14 @@ main() {
         logs|log|l)
             cmd_logs "$@"
             ;;
-        update|upgrade)
-            cmd_update
-            ;;
-        help|-h|--help)
-            cmd_help
+        health|h)
+            cmd_health
             ;;
         version|-v|--version)
             cmd_version
+            ;;
+        help|-h|--help)
+            cmd_help
             ;;
         *)
             log_error "Unknown command: $command"

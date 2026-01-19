@@ -14,7 +14,8 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src/**/*.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "doctor": "node -e \"const pkg=require('./package.json'); const f=pkg.dependencies.fastify; const j=pkg.dependencies['@fastify/jwt']; console.log('Fastify:', f, '| @fastify/jwt:', j); if(f.startsWith('^5') || f.startsWith('5')) { if(!j.startsWith('^8') && !j.startsWith('8')) { console.error('ERROR: Fastify 5 requires @fastify/jwt 8.x'); process.exit(1); } } else if(f.startsWith('^4') || f.startsWith('4')) { if(j.startsWith('^8') || j.startsWith('8')) { console.error('ERROR: Fastify 4 requires @fastify/jwt 7.x'); process.exit(1); } } console.log('OK: Versions compatible');\""
   },
   "dependencies": {
     "@fastify/cookie": "^9.3.1",

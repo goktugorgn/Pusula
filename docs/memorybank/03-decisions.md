@@ -8,12 +8,13 @@ This document indexes all Architecture Decision Records (ADRs) for the Pusula pr
 
 ## Decision Index
 
-| ID                                           | Title                    | Status   | Date    |
-| -------------------------------------------- | ------------------------ | -------- | ------- |
-| [ADR-0001](../adr/0001-tech-stack.md)        | Technology Stack         | Accepted | 2026-01 |
-| [ADR-0002](../adr/0002-auth-model.md)        | Authentication Model     | Accepted | 2026-01 |
-| [ADR-0003](../adr/0003-config-management.md) | Configuration Management | Accepted | 2026-01 |
-| [ADR-0004](../adr/0004-doh-proxy.md)         | DoH via Proxy Service    | Accepted | 2026-01 |
+| ID                                              | Title                    | Status   | Date    |
+| ----------------------------------------------- | ------------------------ | -------- | ------- |
+| [ADR-0001](../adr/0001-tech-stack.md)           | Technology Stack         | Accepted | 2026-01 |
+| [ADR-0002](../adr/0002-auth-model.md)           | Authentication Model     | Accepted | 2026-01 |
+| [ADR-0003](../adr/0003-config-management.md)    | Configuration Management | Accepted | 2026-01 |
+| [ADR-0004](../adr/0004-doh-proxy.md)            | DoH via Proxy Service    | Accepted | 2026-01 |
+| [ADR-0005](../adr/0005-fastify-version-lock.md) | Fastify Version Lock     | Accepted | 2026-01 |
 
 ---
 

@@ -8,6 +8,7 @@
 # Usage:
 #   sudo ./scripts/uninstall.sh         # Keep config and backups
 #   sudo ./scripts/uninstall.sh --purge # Remove everything
+#   sudo ./scripts/uninstall.sh --yes   # Skip confirmation
 #
 # =============================================================================
 
@@ -17,20 +18,22 @@ set -euo pipefail
 # Configuration
 # -----------------------------------------------------------------------------
 INSTALL_DIR="/opt/pusula"
-CONFIG_DIR="/etc/unbound-ui"
-DATA_DIR="/var/lib/unbound-ui"
-LOG_DIR="/var/log/unbound-ui"
-SERVICE_USER="unbound-ui"
-BACKEND_SERVICE="unbound-ui-backend"
-DOH_SERVICE="unbound-ui-doh-proxy"
+CONFIG_DIR="/etc/pusula"
+DATA_DIR="/var/lib/pusula"
+LOG_DIR="/var/log/pusula"
+SERVICE_USER="pusula"
+BACKEND_SERVICE="pusula"
+DOH_SERVICE="pusula-doh-proxy"
 
 PURGE=false
+AUTO_YES=false
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 # -----------------------------------------------------------------------------
@@ -42,13 +45,20 @@ while [[ $# -gt 0 ]]; do
             PURGE=true
             shift
             ;;
+        --yes|-y)
+            AUTO_YES=true
+            shift
+            ;;
         -h|--help)
-            echo "Usage: $0 [--purge]"
+            echo "Pusula Uninstaller"
+            echo ""
+            echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
             echo "  --purge    Remove all data including config and backups"
+            echo "  --yes, -y  Skip confirmation prompts"
             echo ""
-            echo "By default, /etc/unbound-ui and /var/lib/unbound-ui are preserved."
+            echo "By default, /etc/pusula and /var/lib/pusula are preserved."
             exit 0
             ;;
         *)
@@ -85,6 +95,10 @@ check_root() {
 }
 
 confirm() {
+    if [[ "$AUTO_YES" == "true" ]]; then
+        return 0
+    fi
+    
     local prompt="$1"
     local response
     
@@ -133,6 +147,7 @@ remove_unit_files() {
     
     local removed=0
     
+    # New naming
     if [[ -f "/etc/systemd/system/$BACKEND_SERVICE.service" ]]; then
         rm -f "/etc/systemd/system/$BACKEND_SERVICE.service"
         ((removed++))
@@ -142,6 +157,10 @@ remove_unit_files() {
         rm -f "/etc/systemd/system/$DOH_SERVICE.service"
         ((removed++))
     fi
+    
+    # Old naming (cleanup)
+    rm -f /etc/systemd/system/unbound-ui-backend.service 2>/dev/null || true
+    rm -f /etc/systemd/system/unbound-ui-doh-proxy.service 2>/dev/null || true
     
     if [[ $removed -gt 0 ]]; then
         systemctl daemon-reload
@@ -154,11 +173,23 @@ remove_unit_files() {
 remove_sudoers() {
     log_info "Removing sudoers configuration..."
     
-    if [[ -f "/etc/sudoers.d/unbound-ui" ]]; then
-        rm -f "/etc/sudoers.d/unbound-ui"
-        log_success "Removed /etc/sudoers.d/unbound-ui"
+    if [[ -f "/etc/sudoers.d/pusula" ]]; then
+        rm -f "/etc/sudoers.d/pusula"
+        log_success "Removed /etc/sudoers.d/pusula"
+    fi
+    
+    # Old naming cleanup
+    rm -f /etc/sudoers.d/unbound-ui 2>/dev/null || true
+}
+
+remove_cli() {
+    log_info "Removing CLI..."
+    
+    if [[ -f "/usr/local/bin/pusula" ]]; then
+        rm -f "/usr/local/bin/pusula"
+        log_success "Removed /usr/local/bin/pusula"
     else
-        log_info "Sudoers file not found"
+        log_info "CLI not found"
     fi
 }
 
@@ -170,6 +201,11 @@ remove_user() {
         log_success "Removed user: $SERVICE_USER"
     else
         log_info "User $SERVICE_USER not found"
+    fi
+    
+    # Old user cleanup
+    if id "unbound-ui" &>/dev/null; then
+        userdel "unbound-ui" 2>/dev/null || true
     fi
 }
 
@@ -184,17 +220,6 @@ remove_app_directory() {
     fi
 }
 
-remove_cli() {
-    log_info "Removing CLI..."
-    
-    if [[ -f "/usr/local/bin/pusula" ]]; then
-        rm -f "/usr/local/bin/pusula"
-        log_success "Removed /usr/local/bin/pusula"
-    else
-        log_info "CLI not found at /usr/local/bin/pusula"
-    fi
-}
-
 remove_config() {
     log_info "Removing configuration..."
     
@@ -204,6 +229,9 @@ remove_config() {
     else
         log_info "$CONFIG_DIR not found"
     fi
+    
+    # Old config cleanup
+    rm -rf /etc/unbound-ui 2>/dev/null || true
 }
 
 remove_data() {
@@ -215,6 +243,9 @@ remove_data() {
     else
         log_info "$DATA_DIR not found"
     fi
+    
+    # Old data cleanup
+    rm -rf /var/lib/unbound-ui 2>/dev/null || true
 }
 
 remove_logs() {
@@ -226,6 +257,9 @@ remove_logs() {
     else
         log_info "$LOG_DIR not found"
     fi
+    
+    # Old log cleanup
+    rm -rf /var/log/unbound-ui 2>/dev/null || true
 }
 
 # -----------------------------------------------------------------------------
@@ -233,23 +267,26 @@ remove_logs() {
 # -----------------------------------------------------------------------------
 main() {
     echo ""
-    echo "=========================================="
-    echo "  Pusula Uninstaller"
-    echo "=========================================="
+    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║         Pusula Uninstaller             ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
     echo ""
     
     check_root
     
+    echo "This will remove:"
+    echo "  - Pusula service and CLI"
+    echo "  - Application files ($INSTALL_DIR)"
+    echo ""
+    
     if [[ "$PURGE" == "true" ]]; then
-        echo -e "${RED}WARNING: --purge mode will remove ALL data including:${NC}"
+        echo -e "${RED}WARNING: --purge mode will also remove:${NC}"
         echo "  - Configuration files ($CONFIG_DIR)"
         echo "  - Backup snapshots ($DATA_DIR)"
-        echo "  - Audit logs ($LOG_DIR)"
+        echo "  - Logs ($LOG_DIR)"
         echo ""
         confirm "Are you sure you want to purge all Pusula data?"
     else
-        echo "This will remove Pusula services and application files."
-        echo ""
         echo -e "${YELLOW}The following will be PRESERVED:${NC}"
         echo "  - Configuration: $CONFIG_DIR"
         echo "  - Backups: $DATA_DIR"
@@ -266,9 +303,9 @@ main() {
     disable_services
     remove_unit_files
     remove_sudoers
+    remove_cli
     remove_user
     remove_app_directory
-    remove_cli
     
     # Only remove data with --purge
     if [[ "$PURGE" == "true" ]]; then
@@ -278,9 +315,9 @@ main() {
     fi
     
     echo ""
-    echo "=========================================="
-    echo -e "  ${GREEN}Uninstall Complete${NC}"
-    echo "=========================================="
+    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║       ${GREEN}Uninstall Complete${CYAN}               ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
     echo ""
     
     if [[ "$PURGE" != "true" ]]; then

@@ -6,13 +6,14 @@
 # One-command install for Raspberry Pi OS (Bookworm+) / Debian 12+
 #
 # Usage (remote):
-#   curl -fsSL https://raw.githubusercontent.com/goktugorgn/pusula/main/scripts/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/goktugorgn/Pusula/refs/heads/main/scripts/install.sh | sudo bash
 #
 # Usage (local):
 #   sudo ./scripts/install.sh
 #
 # Options:
 #   --upgrade    Force upgrade mode (skip config creation)
+#   --yes        Skip confirmations
 #
 # =============================================================================
 
@@ -23,12 +24,14 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 PUSULA_VERSION="${PUSULA_VERSION:-main}"
 INSTALL_DIR="/opt/pusula"
-CONFIG_DIR="/etc/unbound-ui"
-DATA_DIR="/var/lib/unbound-ui"
-LOG_DIR="/var/log/unbound-ui"
-SERVICE_USER="unbound-ui"
+CURRENT_DIR="$INSTALL_DIR/current"
+CONFIG_DIR="/etc/pusula"
+DATA_DIR="/var/lib/pusula"
+LOG_DIR="/var/log/pusula"
+SERVICE_USER="pusula"
+SERVICE_GROUP="pusula"
 BACKEND_PORT="${PUSULA_PORT:-3000}"
-REPO_URL="https://github.com/goktugorgn/pusula.git"
+REPO_URL="https://github.com/goktugorgn/Pusula.git"
 
 # Colors for output
 RED='\033[0;31m'
@@ -41,8 +44,8 @@ NC='\033[0m' # No Color
 # Flags
 UPGRADE_MODE=false
 REMOTE_INSTALL=false
+AUTO_YES=false
 INITIAL_PASSWORD=""
-GENERATE_PASSWORD_LATER=0
 
 # -----------------------------------------------------------------------------
 # Parse Arguments
@@ -53,6 +56,10 @@ while [[ $# -gt 0 ]]; do
             UPGRADE_MODE=true
             shift
             ;;
+        --yes|-y)
+            AUTO_YES=true
+            shift
+            ;;
         -h|--help)
             echo "Pusula Installer"
             echo ""
@@ -60,6 +67,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --upgrade    Force upgrade mode (preserve existing config)"
+            echo "  --yes, -y    Skip confirmations"
             echo "  -h, --help   Show this help"
             exit 0
             ;;
@@ -112,7 +120,7 @@ check_os() {
 
 detect_install_mode() {
     # Check if this is a re-install (upgrade)
-    if [[ -d "$INSTALL_DIR" && -f "$CONFIG_DIR/config.yaml" ]]; then
+    if [[ -d "$CURRENT_DIR" && -f "$CONFIG_DIR/config.yaml" ]]; then
         log_info "Existing installation detected. Running in upgrade mode."
         UPGRADE_MODE=true
     fi
@@ -139,6 +147,7 @@ install_dependencies() {
         git \
         unbound \
         unbound-host \
+        jq \
         || log_error "Failed to install essential packages"
     
     # Install Node.js via NodeSource (LTS) if not present
@@ -184,23 +193,23 @@ create_user() {
 create_directories() {
     log_info "Creating directories..."
     
+    # Install directory
+    mkdir -p "$INSTALL_DIR"
+    
     # Config directory
     mkdir -p "$CONFIG_DIR"
     chmod 750 "$CONFIG_DIR"
-    chown root:"$SERVICE_USER" "$CONFIG_DIR"
+    chown root:"$SERVICE_GROUP" "$CONFIG_DIR"
     
     # Data directory
     mkdir -p "$DATA_DIR/backups"
     chmod 750 "$DATA_DIR"
-    chown -R "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR"
+    chown -R "$SERVICE_USER":"$SERVICE_GROUP" "$DATA_DIR"
     
     # Log directory
     mkdir -p "$LOG_DIR"
     chmod 750 "$LOG_DIR"
     chown "$SERVICE_USER":adm "$LOG_DIR"
-    
-    # Install directory
-    mkdir -p "$INSTALL_DIR"
     
     log_success "Directories created"
 }
@@ -219,7 +228,7 @@ server:
   port: 3000
 
 unbound:
-  managedConfigPath: /etc/unbound/unbound-ui-managed.conf
+  managedConfigPath: /etc/unbound/pusula-managed.conf
 
 pihole:
   enabled: false
@@ -232,14 +241,14 @@ alerts:
 
 backup:
   maxSnapshots: 10
-  path: /var/lib/unbound-ui/backups
+  path: /var/lib/pusula/backups
 
 logging:
   level: info
-  auditPath: /var/log/unbound-ui/audit.log
+  auditPath: /var/log/pusula/audit.log
 EOF
         chmod 640 "$CONFIG_DIR/config.yaml"
-        chown root:"$SERVICE_USER" "$CONFIG_DIR/config.yaml"
+        chown root:"$SERVICE_GROUP" "$CONFIG_DIR/config.yaml"
         log_success "Created config.yaml"
     else
         log_info "config.yaml already exists, preserving"
@@ -248,33 +257,33 @@ EOF
     # Credentials file
     if [[ ! -f "$CONFIG_DIR/credentials.json" ]]; then
         INITIAL_PASSWORD="admin"
-        GENERATE_PASSWORD_LATER=1
         log_info "Will create credentials after backend installation"
     else
         log_info "credentials.json already exists, preserving"
     fi
     
     # Environment file
-    if [[ ! -f "$CONFIG_DIR/unbound-ui.env" ]]; then
+    if [[ ! -f "$CONFIG_DIR/pusula.env" ]]; then
         # Generate JWT secret
         JWT_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64)
         
-        cat > "$CONFIG_DIR/unbound-ui.env" << EOF
+        cat > "$CONFIG_DIR/pusula.env" << EOF
 # Pusula Environment Variables
 NODE_ENV=production
 JWT_SECRET=$JWT_SECRET
 CONFIG_PATH=$CONFIG_DIR/config.yaml
 CREDENTIALS_PATH=$CONFIG_DIR/credentials.json
-UPSTREAM_PATH=$DATA_DIR/upstream.json
+UPSTREAM_PATH=$CONFIG_DIR/upstream.json
 BACKUP_DIR=$DATA_DIR/backups
 AUDIT_LOG_PATH=$LOG_DIR/audit.log
 ALERTS_PATH=$DATA_DIR/alerts.json
+UI_STATIC_PATH=$CURRENT_DIR/apps/ui/dist
 EOF
-        chmod 640 "$CONFIG_DIR/unbound-ui.env"
-        chown root:"$SERVICE_USER" "$CONFIG_DIR/unbound-ui.env"
-        log_success "Created unbound-ui.env"
+        chmod 640 "$CONFIG_DIR/pusula.env"
+        chown root:"$SERVICE_GROUP" "$CONFIG_DIR/pusula.env"
+        log_success "Created pusula.env"
     else
-        log_info "unbound-ui.env already exists, preserving"
+        log_info "pusula.env already exists, preserving"
     fi
 }
 
@@ -284,65 +293,61 @@ EOF
 install_application() {
     log_info "Installing Pusula application..."
     
-    # Determine source directory
     local SOURCE_DIR=""
+    local RELEASE_DIR="$INSTALL_DIR/releases/$(date +%Y%m%d%H%M%S)"
     
     if [[ "$REMOTE_INSTALL" == "true" ]]; then
         # Remote install: clone from git
         log_info "Cloning repository..."
-        if [[ -d "$INSTALL_DIR/.git" ]]; then
-            cd "$INSTALL_DIR"
-            git fetch origin
-            git reset --hard "origin/$PUSULA_VERSION"
-        else
-            rm -rf "$INSTALL_DIR"
-            git clone --depth 1 --branch "$PUSULA_VERSION" "$REPO_URL" "$INSTALL_DIR"
-        fi
-        SOURCE_DIR="$INSTALL_DIR"
+        mkdir -p "$RELEASE_DIR"
+        git clone --depth 1 --branch "$PUSULA_VERSION" "$REPO_URL" "$RELEASE_DIR"
+        SOURCE_DIR="$RELEASE_DIR"
     else
         # Local install: use script's directory
         local SCRIPT_DIR
         SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
         
-        # Copy to install directory
+        # Copy to release directory
         log_info "Copying from local source..."
-        if [[ "$SOURCE_DIR" != "$INSTALL_DIR" ]]; then
-            rm -rf "$INSTALL_DIR"
-            mkdir -p "$INSTALL_DIR"
-            cp -r "$SOURCE_DIR/apps" "$INSTALL_DIR/"
-            cp -r "$SOURCE_DIR/scripts" "$INSTALL_DIR/"
-            cp -r "$SOURCE_DIR/systemd" "$INSTALL_DIR/"
-            cp -r "$SOURCE_DIR/system" "$INSTALL_DIR/"
-        fi
+        mkdir -p "$RELEASE_DIR"
+        cp -r "$SOURCE_DIR/apps" "$RELEASE_DIR/"
+        cp -r "$SOURCE_DIR/scripts" "$RELEASE_DIR/"
+        cp -r "$SOURCE_DIR/systemd" "$RELEASE_DIR/"
+        cp -r "$SOURCE_DIR/system" "$RELEASE_DIR/" 2>/dev/null || true
+        cp -r "$SOURCE_DIR/docs" "$RELEASE_DIR/" 2>/dev/null || true
     fi
     
     # Build backend
     log_info "Building backend..."
-    cd "$INSTALL_DIR/apps/backend"
+    cd "$RELEASE_DIR/apps/backend"
     npm ci --production --silent 2>/dev/null || npm install --production --silent
     npm run build --silent 2>/dev/null || true
     
     # Build UI if not pre-built
     log_info "Building UI..."
-    if [[ -d "$INSTALL_DIR/apps/ui/dist" ]]; then
+    if [[ -d "$RELEASE_DIR/apps/ui/dist" ]]; then
         log_info "UI already built, skipping"
-    elif [[ -d "$INSTALL_DIR/apps/ui" ]]; then
-        cd "$INSTALL_DIR/apps/ui"
+    elif [[ -d "$RELEASE_DIR/apps/ui" ]]; then
+        cd "$RELEASE_DIR/apps/ui"
         npm ci --silent 2>/dev/null || npm install --silent
         npm run build --silent
     fi
     
+    # Update current symlink
+    log_info "Updating current symlink..."
+    rm -f "$CURRENT_DIR"
+    ln -sf "$RELEASE_DIR" "$CURRENT_DIR"
+    
     # Set permissions
-    chown -R root:root "$INSTALL_DIR"
-    chmod -R 755 "$INSTALL_DIR"
+    chown -R root:root "$RELEASE_DIR"
+    chmod -R 755 "$RELEASE_DIR"
     
     # Generate password hash if needed
-    if [[ "$GENERATE_PASSWORD_LATER" == "1" ]]; then
+    if [[ -n "$INITIAL_PASSWORD" && ! -f "$CONFIG_DIR/credentials.json" ]]; then
         log_info "Generating credentials..."
-        cd "$INSTALL_DIR/apps/backend"
+        cd "$CURRENT_DIR/apps/backend"
         
-        # Install bcrypt temporarily if needed for CLI
         PASSWORD_HASH=$(node -e "
             const bcrypt = require('bcrypt');
             console.log(bcrypt.hashSync('$INITIAL_PASSWORD', 12));
@@ -356,10 +361,11 @@ install_application() {
 }
 EOF
             chmod 600 "$CONFIG_DIR/credentials.json"
-            chown "$SERVICE_USER":"$SERVICE_USER" "$CONFIG_DIR/credentials.json"
+            chown "$SERVICE_USER":"$SERVICE_GROUP" "$CONFIG_DIR/credentials.json"
             log_success "Created credentials.json"
         else
             log_warn "Could not generate password hash. Manual setup required."
+            INITIAL_PASSWORD=""
         fi
     fi
     
@@ -372,18 +378,15 @@ EOF
 install_cli() {
     log_info "Installing CLI..."
     
-    local CLI_SOURCE=""
-    if [[ -f "$INSTALL_DIR/scripts/pusula-cli.sh" ]]; then
-        CLI_SOURCE="$INSTALL_DIR/scripts/pusula-cli.sh"
+    local CLI_SOURCE="$CURRENT_DIR/scripts/pusula-cli.sh"
+    
+    if [[ -f "$CLI_SOURCE" ]]; then
+        cp "$CLI_SOURCE" /usr/local/bin/pusula
+        chmod +x /usr/local/bin/pusula
+        log_success "CLI installed: /usr/local/bin/pusula"
     else
-        log_warn "CLI script not found in $INSTALL_DIR/scripts/"
-        return
+        log_warn "CLI script not found"
     fi
-    
-    cp "$CLI_SOURCE" /usr/local/bin/pusula
-    chmod +x /usr/local/bin/pusula
-    
-    log_success "CLI installed: /usr/local/bin/pusula"
 }
 
 # -----------------------------------------------------------------------------
@@ -393,25 +396,28 @@ install_systemd() {
     log_info "Installing systemd units..."
     
     # Stop existing service if running
-    if systemctl is-active --quiet unbound-ui-backend 2>/dev/null; then
-        systemctl stop unbound-ui-backend || true
+    systemctl stop pusula 2>/dev/null || true
+    systemctl stop pusula-doh-proxy 2>/dev/null || true
+    
+    # Remove old units if they exist
+    rm -f /etc/systemd/system/unbound-ui-backend.service 2>/dev/null || true
+    rm -f /etc/systemd/system/unbound-ui-doh-proxy.service 2>/dev/null || true
+    
+    # Copy new service files
+    if [[ -f "$CURRENT_DIR/systemd/pusula.service" ]]; then
+        cp "$CURRENT_DIR/systemd/pusula.service" /etc/systemd/system/
     fi
     
-    # Copy service files
-    if [[ -f "$INSTALL_DIR/systemd/unbound-ui-backend.service" ]]; then
-        cp "$INSTALL_DIR/systemd/unbound-ui-backend.service" /etc/systemd/system/
-    fi
-    
-    if [[ -f "$INSTALL_DIR/systemd/unbound-ui-doh-proxy.service" ]]; then
-        cp "$INSTALL_DIR/systemd/unbound-ui-doh-proxy.service" /etc/systemd/system/
+    if [[ -f "$CURRENT_DIR/systemd/pusula-doh-proxy.service" ]]; then
+        cp "$CURRENT_DIR/systemd/pusula-doh-proxy.service" /etc/systemd/system/
     fi
     
     # Reload systemd
     systemctl daemon-reload
     
     # Enable and start backend
-    systemctl enable unbound-ui-backend
-    systemctl start unbound-ui-backend
+    systemctl enable pusula
+    systemctl start pusula
     
     log_success "Systemd units installed and started"
 }
@@ -422,18 +428,36 @@ install_systemd() {
 install_sudoers() {
     log_info "Installing sudoers configuration..."
     
-    if [[ -f "$INSTALL_DIR/system/sudoers-unbound-ui" ]]; then
-        cp "$INSTALL_DIR/system/sudoers-unbound-ui" /etc/sudoers.d/unbound-ui
-        chmod 440 /etc/sudoers.d/unbound-ui
-        
-        # Validate
-        if visudo -c -f /etc/sudoers.d/unbound-ui &>/dev/null; then
-            log_success "Sudoers configuration installed and validated"
-        else
-            log_error "Sudoers validation failed! Check /etc/sudoers.d/unbound-ui"
-        fi
+    cat > /etc/sudoers.d/pusula << 'EOF'
+# Pusula sudoers configuration
+# Allow pusula user to run specific commands without password
+
+# Unbound control commands
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control status
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control stats_noreset
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control reload
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_zone *
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-control flush_requestlist
+pusula ALL=(ALL) NOPASSWD: /usr/sbin/unbound-checkconf
+
+# Systemctl (Unbound only)
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl is-active unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl status unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl reload unbound
+pusula ALL=(ALL) NOPASSWD: /bin/systemctl restart unbound
+
+# Journalctl (read-only)
+pusula ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u unbound *
+EOF
+    
+    chmod 440 /etc/sudoers.d/pusula
+    
+    # Validate
+    if visudo -c -f /etc/sudoers.d/pusula &>/dev/null; then
+        log_success "Sudoers configuration installed and validated"
     else
-        log_warn "Sudoers file not found in $INSTALL_DIR/system/"
+        log_warn "Sudoers validation failed, removing invalid file"
+        rm -f /etc/sudoers.d/pusula
     fi
 }
 
@@ -446,14 +470,12 @@ health_check() {
     # Wait for service to start
     sleep 3
     
-    local all_ok=true
-    
     # Check service status
-    if systemctl is-active --quiet unbound-ui-backend; then
+    if systemctl is-active --quiet pusula; then
         log_success "Backend service is running"
     else
-        log_warn "Backend service may not be running. Check: journalctl -u unbound-ui-backend"
-        all_ok=false
+        log_warn "Backend service may not be running. Check: journalctl -u pusula"
+        return
     fi
     
     # Check health endpoint (retry a few times)
@@ -470,10 +492,7 @@ health_check() {
         log_success "Health endpoint responding"
     else
         log_warn "Health endpoint not responding yet. Service may still be starting..."
-        all_ok=false
     fi
-    
-    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -527,6 +546,7 @@ main() {
     echo ""
     echo "  CLI commands:"
     echo "    pusula status       - Show service status"
+    echo "    pusula health       - Check API health"
     echo "    pusula logs backend - View backend logs"
     echo "    sudo pusula restart - Restart service"
     echo ""
