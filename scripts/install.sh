@@ -264,8 +264,8 @@ EOF
     
     # Environment file
     if [[ ! -f "$CONFIG_DIR/pusula.env" ]]; then
-        # Generate JWT secret
-        JWT_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64)
+        # Generate JWT secret (|| true to prevent SIGPIPE exit)
+        JWT_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64 || true)
         
         cat > "$CONFIG_DIR/pusula.env" << EOF
 # Pusula Environment Variables
@@ -292,6 +292,7 @@ EOF
 # -----------------------------------------------------------------------------
 install_application() {
     log_info "Installing Pusula application..."
+    log_info "  Remote install: $REMOTE_INSTALL"
     
     local SOURCE_DIR=""
     local RELEASE_DIR="$INSTALL_DIR/releases/$(date +%Y%m%d%H%M%S)"
