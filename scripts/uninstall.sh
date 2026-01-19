@@ -234,7 +234,7 @@ remove_user() {
     log_info "Removing system user..."
     
     if id "$SERVICE_USER" &>/dev/null; then
-        userdel "$SERVICE_USER" 2>/dev/null || true
+        userdel -f "$SERVICE_USER" 2>/dev/null || true
         log_success "Removed user: $SERVICE_USER"
     else
         log_info "User $SERVICE_USER not found"
@@ -242,7 +242,7 @@ remove_user() {
     
     # Old user cleanup
     if id "unbound-ui" &>/dev/null; then
-        userdel "unbound-ui" 2>/dev/null || true
+        userdel -f "unbound-ui" 2>/dev/null || true
     fi
 }
 
