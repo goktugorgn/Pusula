@@ -33,6 +33,43 @@ Default: `https://192.168.1.x:3000/api`
 | Alternative | httpOnly cookie (`pusula_token`) |
 | Expiry      | Configurable (default: 24 hours) |
 
+### Login Request
+
+```json
+POST /api/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "your-password"
+}
+```
+
+### Login Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "expiresIn": 86400
+  }
+}
+```
+
+### UI Token Persistence Policy
+
+| Aspect | Policy |
+| ------ | ------ |
+| Storage | Always persist to `localStorage` |
+| Rationale | LAN-only single-user homelab app; convenience prioritized |
+| Key | `auth_token` |
+| Rehydration | On app load, token is restored from `localStorage` |
+| Expiry handling | On 401, token is cleared and user redirected to login |
+
+> [!NOTE]
+> The UI always persists tokens because Pusula is designed for LAN-only access with a single admin user. This prioritizes user experience (staying logged in across refreshes) over XSS concerns that apply to internet-facing apps.
+
 ---
 
 ## Endpoint Summary

@@ -69,43 +69,51 @@ export class ApiError extends Error {
 
 /**
  * Token storage strategy:
- * - Primary: In-memory (more secure, cleared on page refresh)
- * - Fallback: localStorage (persists across sessions)
- * 
- * Tradeoffs:
- * - In-memory: More secure (no XSS access), but user must re-login after refresh
- * - localStorage: Convenient (persists), but vulnerable to XSS attacks
- * 
- * We use in-memory as primary and localStorage as a persistence layer that
- * can be optionally enabled via "remember me" functionality.
+ * - Always persist to localStorage (LAN-only single-user homelab app)
+ * - In-memory cache for performance
+ *
+ * Security context:
+ * - Pusula is designed for LAN-only access (no internet exposure)
+ * - Single admin user model means XSS risk is minimal
+ * - User experience (staying logged in) is prioritized
+ * - Token has 24h TTL from backend
  */
 
 let inMemoryToken: string | null = null;
 
 export const tokenStore = {
   get(): string | null {
-    // Check in-memory first
+    // Check in-memory cache first
     if (inMemoryToken) return inMemoryToken;
-    
-    // Fallback to localStorage
-    return localStorage.getItem('auth_token');
+
+    // Rehydrate from localStorage
+    const stored = localStorage.getItem('auth_token');
+    if (stored) {
+      inMemoryToken = stored; // Cache it
+    }
+    return stored;
   },
 
-  set(token: string, persist = false): void {
+  set(token: string, _persist = true): void {
+    // Always persist for LAN-only single-user app
     inMemoryToken = token;
-    
-    if (persist) {
-      localStorage.setItem('auth_token', token);
-    }
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('authenticated', 'true');
   },
 
   clear(): void {
     inMemoryToken = null;
     localStorage.removeItem('auth_token');
     localStorage.removeItem('authenticated');
+    localStorage.removeItem('user');
   },
 
   isAuthenticated(): boolean {
+    return !!this.get();
+  },
+
+  /** Check if we have a token (for conditional query enabling) */
+  hasToken(): boolean {
     return !!this.get();
   },
 };
