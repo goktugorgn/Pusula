@@ -68,6 +68,24 @@ Tarayıcınızdan `http://<IP_ADRESINIZ>:3000` adresine gidin ve giriş yapın.
 
 > **Önemli:** İlk girişten sonra şifrenizi "Ayarlar" (Settings) menüsünden değiştirmeniz tavsiye edilir.
 
+### Firewall (Güvenlik Duvarı)
+
+Eğer `ufw` aktifse, port 3000'e izin vermeniz gerekir:
+
+```bash
+sudo ufw allow 3000/tcp
+sudo ufw reload
+```
+
+### Dosya Konumları
+
+| Konum              | Açıklama                       |
+| ------------------ | ------------------------------ |
+| `/opt/pusula/`     | Uygulama dosyaları             |
+| `/etc/pusula/`     | Konfigürasyon dosyaları        |
+| `/var/lib/pusula/` | Veri (yedekler, upstream.json) |
+| `/var/log/pusula/` | Log dosyaları                  |
+
 ---
 
 ## Geliştirme (Local Development)
@@ -120,7 +138,31 @@ Projeyi macOS veya Linux üzerinde, Raspberry Pi olmadan geliştirmek için **DE
 
 ## CLI Kullanımı
 
-Kurulumdan sonra `pusula` komutu ile servisi yönetebilirsiniz:
+Pusula, terminal üzerinden servis yönetimi için bir CLI aracı sunar. Bu araç kurulum sırasında `/usr/local/bin/pusula` konumuna otomatik olarak yüklenir, `pusula` komutu ile servisi yönetebilirsiniz
+
+### Komutlar
+
+| Komut                      | Açıklama                                                        | Root Gerekli |
+| -------------------------- | --------------------------------------------------------------- | ------------ |
+| `pusula status`            | Tüm servislerin durumunu gösterir (Backend, Unbound, DoH Proxy) | ❌           |
+| `pusula health`            | API sağlık kontrolü yapar (`/api/health` endpoint)              | ❌           |
+| `pusula logs [hedef]`      | Logları canlı takip eder                                        | ❌           |
+| `pusula version`           | Sürüm bilgilerini gösterir                                      | ❌           |
+| `pusula start`             | Backend servisini başlatır                                      | ✅           |
+| `pusula stop`              | Backend servisini durdurur                                      | ✅           |
+| `pusula restart`           | Backend servisini yeniden başlatır                              | ✅           |
+| `pusula autostart on\|off` | Otomatik başlatmayı açar/kapatır                                | ✅           |
+
+### Log Hedefleri
+
+`pusula logs` komutu aşağıdaki hedefleri destekler:
+
+- `backend` veya `b` - Pusula backend logları
+- `unbound` veya `u` - Unbound DNS logları
+- `proxy` veya `p` - DoH Proxy logları
+- `audit` veya `a` - Güvenlik denetim logları
+
+### Örnekler
 
 ```bash
 # Servis durumunu göster
@@ -129,7 +171,7 @@ pusula status
 # API sağlık kontrolü
 pusula health
 
-# Logları takip et
+# Backend loglarını canlı takip et
 pusula logs backend
 
 # Servisi yeniden başlat
@@ -137,9 +179,57 @@ sudo pusula restart
 
 # Otomatik başlatmayı etkinleştir
 sudo pusula autostart on
+
+# Sürüm bilgisini göster
+pusula version
 ```
 
 Tüm komutlar için: `pusula help`
+
+---
+
+## Sorun Giderme
+
+### LAN'dan Erişilemiyor
+
+1. **Servis çalışıyor mu?**
+
+   ```bash
+   sudo systemctl status pusula-backend
+   ```
+
+2. **Port dinleniyor mu?**
+
+   ```bash
+   sudo ss -tulpn | grep 3000
+   ```
+
+   `0.0.0.0:3000` veya `*:3000` görmeniz gerekir. Sadece `127.0.0.1:3000` görüyorsanız, `/etc/pusula/config.yaml` dosyasında `host: "0.0.0.0"` ayarlayın.
+
+3. **Firewall açık mı?**
+   ```bash
+   sudo ufw status
+   sudo ufw allow 3000/tcp
+   ```
+
+### Servis Başlamıyor
+
+```bash
+# Hata loglarını görüntüle
+sudo journalctl -u pusula-backend -n 50
+
+# Manuel test
+cd /opt/pusula/current/backend
+sudo -u pusula node dist/index.js
+```
+
+### Yaygın Hatalar
+
+| Hata                    | Çözüm                                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `EADDRINUSE`            | Port 3000 başka bir işlem tarafından kullanılıyor. `sudo lsof -i :3000` ile kontrol edin. |
+| `credentials not found` | `/etc/pusula/credentials.json` dosyası eksik veya okunamıyor.                             |
+| `JWT_SECRET missing`    | `/etc/pusula/pusula.env` dosyasında `JWT_SECRET` tanımlı değil.                           |
 
 ---
 
