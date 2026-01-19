@@ -177,6 +177,15 @@ install_dependencies() {
         log_error "Node.js version fix failed. Found: $(node --version). Required: v18-v22."
     fi
     
+    # Install TypeScript globally for manual rebuilds
+    if ! command -v tsc &>/dev/null; then
+        log_info "Installing TypeScript globally..."
+        npm install -g typescript 2>&1
+        log_success "TypeScript installed: $(tsc --version)"
+    else
+        log_info "TypeScript already installed: $(tsc --version)"
+    fi
+    
     log_success "Dependencies installed (Node.js $(node --version))"
 }
 

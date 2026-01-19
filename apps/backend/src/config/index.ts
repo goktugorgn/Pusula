@@ -25,10 +25,10 @@ let cachedUpstream: UpstreamConfig | null = null;
 export function loadConfig(): AppConfig {
   if (cachedConfig) return cachedConfig;
 
-  // Priority: env var > /etc/unbound-ui/config.yaml > local config.yaml
+  // Priority: env var > /etc/pusula/config.yaml > local config.yaml
   const configPaths = [
     process.env.CONFIG_PATH,
-    '/etc/unbound-ui/config.yaml',
+    '/etc/pusula/config.yaml',
     './config.yaml',
   ].filter(Boolean) as string[];
 
@@ -80,10 +80,10 @@ export function loadConfig(): AppConfig {
 export function loadCredentials(): Credentials {
   if (cachedCredentials) return cachedCredentials;
 
-  // Priority: env var > /etc/unbound-ui/credentials.json > local credentials.json
+  // Priority: env var > /etc/pusula/credentials.json > local credentials.json
   const credentialsPaths = [
     process.env.CREDENTIALS_PATH,
-    '/etc/unbound-ui/credentials.json',
+    '/etc/pusula/credentials.json',
     './credentials.json',
   ].filter(Boolean) as string[];
 
@@ -111,7 +111,7 @@ export function loadUpstreamConfig(): UpstreamConfig {
   if (cachedUpstream) return cachedUpstream;
 
   const upstreamPath =
-    process.env.UPSTREAM_PATH || '/var/lib/unbound-ui/upstream.json';
+    process.env.UPSTREAM_PATH || '/var/lib/pusula/upstream.json';
 
   if (!existsSync(upstreamPath)) {
     // Return default if file doesn't exist

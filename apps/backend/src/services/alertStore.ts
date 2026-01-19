@@ -45,7 +45,7 @@ export interface AlertStoreData {
 // CONFIGURATION
 // ============================================================================
 
-const ALERT_STORE_PATH = process.env.ALERT_STORE_PATH || '/var/lib/unbound-ui/alerts.json';
+const ALERT_STORE_PATH = process.env.ALERT_STORE_PATH || process.env.ALERTS_PATH || '/var/lib/pusula/alerts.json';
 
 /** Cooldown period before re-alerting on same rule (ms) */
 const ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes

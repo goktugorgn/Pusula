@@ -44,7 +44,7 @@ export interface AuditEntry {
 
 // Default log path
 let logPath =
-  process.env.AUDIT_LOG_PATH || '/var/log/unbound-ui/audit.log';
+  process.env.AUDIT_LOG_PATH || '/var/log/pusula/audit.log';
 
 /**
  * Configure audit logger

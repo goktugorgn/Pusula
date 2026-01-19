@@ -32,9 +32,9 @@ import {
 const MAX_SNAPSHOTS = 10;
 
 // Default paths
-const BACKUP_DIR = process.env.BACKUP_DIR || '/var/lib/unbound-ui/backups';
-const MANAGED_CONF = process.env.UNBOUND_MANAGED_CONF || '/etc/unbound/unbound-ui-managed.conf';
-const UPSTREAM_PATH = process.env.UPSTREAM_PATH || '/var/lib/unbound-ui/upstream.json';
+const BACKUP_DIR = process.env.BACKUP_DIR || '/var/lib/pusula/backups';
+const MANAGED_CONF = process.env.UNBOUND_MANAGED_CONF || '/etc/unbound/pusula-managed.conf';
+const UPSTREAM_PATH = process.env.UPSTREAM_PATH || '/var/lib/pusula/upstream.json';
 
 export interface Snapshot {
   id: string;

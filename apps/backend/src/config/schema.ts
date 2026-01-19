@@ -37,7 +37,7 @@ export const lockoutConfigSchema = z.object({
 // Unbound configuration
 export const unboundConfigSchema = z.object({
   mainConfigPath: z.string().default('/etc/unbound/unbound.conf'),
-  managedIncludePath: z.string().default('/etc/unbound/unbound-ui-managed.conf'),
+  managedIncludePath: z.string().default('/etc/unbound/pusula-managed.conf'),
 });
 
 // Pi-hole configuration

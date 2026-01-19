@@ -100,7 +100,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
       // Update credentials file
       const credentialsPath =
-        process.env.CREDENTIALS_PATH || '/etc/unbound-ui/credentials.json';
+        process.env.CREDENTIALS_PATH || '/etc/pusula/credentials.json';
 
       const credentials = loadCredentials();
       credentials.passwordHash = newHash;
