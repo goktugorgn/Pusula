@@ -3,6 +3,7 @@
  * GET /api/unbound/status
  * GET /api/unbound/stats
  * GET /api/unbound/logs
+ * GET /api/unbound/connection
  * POST /api/unbound/reload
  * POST /api/unbound/restart
  * POST /api/unbound/flush
@@ -16,6 +17,7 @@ import { logsQuerySchema, flushCacheRequestSchema, loadUpstreamConfig } from '..
 import {
   getUnboundStatus,
   getUnboundStats,
+  getUnboundConnection,
   reloadUnbound,
   restartUnbound,
   flushAllCache,
@@ -88,6 +90,19 @@ export async function unboundRoutes(fastify: FastifyInstance): Promise<void> {
       };
     }
   );
+
+  /**
+   * GET /api/unbound/connection
+   * Returns connection status for UI health indicators
+   */
+  fastify.get('/unbound/connection', async (_request: FastifyRequest, _reply: FastifyReply) => {
+    const connection = await getUnboundConnection();
+
+    return {
+      success: true,
+      data: connection,
+    };
+  });
 
   /**
    * POST /api/unbound/reload

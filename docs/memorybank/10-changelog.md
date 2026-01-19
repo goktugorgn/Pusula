@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `install_nodejs_20()` function: fetches NodeSource setup_20.x script
   - Cleaner dependency handling with before/after version logging
 
+- **Unbound Integration Fix (2026-01-19)**:
+  - **New endpoint**: `GET /api/unbound/connection` - Returns connectivity status for UI health indicators
+  - **Backend**: Added `checkConfigWithDetails()` returning stdout/stderr for config validation
+  - **Backend**: Added `getUnboundConnection()` for connectivity monitoring with last success/error tracking
+  - **Self-test**: `config_validation` now returns detailed error output with diagnostics
+  - **Self-test**: `observation_window` now provides actionable error messages (permissions, certs, remote-control hints)
+  - **UI**: Added `keepPreviousData` to all React Query hooks - prevents flicker during refetch
+  - **UI**: Added connection status badge ("Connected" / "Degraded") to dashboard header
+  - **Types**: Added `UnboundConnection` interface to frontend types
+
 ---
 
 ## [1.0.0] - 2026-01-18

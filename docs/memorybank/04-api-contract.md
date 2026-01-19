@@ -47,12 +47,13 @@ Default: `https://192.168.1.x:3000/api`
 
 ### Health & Status
 
-| Method | Endpoint          | Description                   |
-| ------ | ----------------- | ----------------------------- |
-| `GET`  | `/health`         | Backend health check (public) |
-| `GET`  | `/unbound/status` | Unbound service status        |
-| `GET`  | `/unbound/stats`  | Resolver statistics           |
-| `GET`  | `/unbound/logs`   | Recent log entries            |
+| Method | Endpoint              | Description                           |
+| ------ | --------------------- | ------------------------------------- |
+| `GET`  | `/health`             | Backend health check (public)         |
+| `GET`  | `/unbound/status`     | Unbound service status                |
+| `GET`  | `/unbound/stats`      | Resolver statistics                   |
+| `GET`  | `/unbound/logs`       | Recent log entries                    |
+| `GET`  | `/unbound/connection` | Connectivity status for UI indicators |
 
 ### Unbound Control
 

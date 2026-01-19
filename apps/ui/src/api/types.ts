@@ -22,6 +22,14 @@ export interface UnboundStats {
   avgResponseTime?: number;
 }
 
+export interface UnboundConnection {
+  connected: boolean;
+  method: 'unbound-control';
+  lastSuccessAt?: string;
+  lastError?: string;
+  version?: string;
+}
+
 export interface LogEntry {
   timestamp: string;
   priority: number;

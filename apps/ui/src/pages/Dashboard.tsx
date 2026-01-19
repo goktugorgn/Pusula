@@ -2,16 +2,16 @@
  * Dashboard Page
  * 
  * Live system overview with:
- * - Status/stats polling (3s)
+ * - Status/stats polling (3s) with smooth updates (keepPreviousData)
  * - Alerts polling (15s)
  * - Mini charts for trends
  * - Quick actions with confirmations
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { getApi, postApi } from '../api/client';
-import type { UnboundStatus, UnboundStats, UpstreamConfig, Alert } from '../api/types';
+import type { UnboundStatus, UnboundStats, UpstreamConfig, Alert, UnboundConnection } from '../api/types';
 import {
   GlassCard,
   StatCard,
@@ -25,7 +25,7 @@ import {
 } from '../components/ui';
 
 // ============================================================================
-// Data Polling Hooks
+// Data Polling Hooks (with keepPreviousData for smooth updates)
 // ============================================================================
 
 function useUnboundStatus() {
@@ -34,6 +34,7 @@ function useUnboundStatus() {
     queryFn: () => getApi<UnboundStatus>('/unbound/status'),
     refetchInterval: 3000,
     staleTime: 2000,
+    placeholderData: keepPreviousData, // Keep previous data during refetch
   });
 }
 
@@ -43,6 +44,17 @@ function useUnboundStats() {
     queryFn: () => getApi<UnboundStats>('/unbound/stats'),
     refetchInterval: 3000,
     staleTime: 2000,
+    placeholderData: keepPreviousData, // Keep previous data during refetch
+  });
+}
+
+function useUnboundConnection() {
+  return useQuery({
+    queryKey: ['unbound-connection'],
+    queryFn: () => getApi<UnboundConnection>('/unbound/connection'),
+    refetchInterval: 10000, // Less frequent - connectivity check
+    staleTime: 8000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -51,6 +63,7 @@ function useUpstreamConfig() {
     queryKey: ['upstream'],
     queryFn: () => getApi<UpstreamConfig>('/upstream'),
     staleTime: 30000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -60,6 +73,7 @@ function useAlerts() {
     queryFn: () => getApi<{ alerts: Alert[]; activeCount: number }>('/alerts'),
     refetchInterval: 15000,
     staleTime: 10000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -196,6 +210,7 @@ export default function DashboardPage() {
   // Data queries
   const { data: status, isLoading: statusLoading } = useUnboundStatus();
   const { data: stats, isLoading: statsLoading } = useUnboundStats();
+  const { data: connection } = useUnboundConnection();
   const { data: upstream } = useUpstreamConfig();
   const { data: alertsData } = useAlerts();
 
@@ -243,6 +258,17 @@ export default function DashboardPage() {
           <p className="text-white/60 text-sm">Real-time DNS resolver overview</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Connection status indicator */}
+          {connection && (
+            <span title={connection.connected ? `Connected via ${connection.method}` : connection.lastError}>
+              <Badge 
+                variant={connection.connected ? 'success' : 'danger'} 
+                dot={connection.connected}
+              >
+                {connection.connected ? 'Connected' : 'Degraded'}
+              </Badge>
+            </span>
+          )}
           {upstream?.mode && <ModeBadge mode={upstream.mode} />}
           {activeAlerts > 0 && (
             <Badge variant="warning" dot pulse>

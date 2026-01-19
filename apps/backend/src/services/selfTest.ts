@@ -12,7 +12,7 @@
 import * as tls from 'node:tls';
 import * as net from 'node:net';
 import * as dns from 'node:dns/promises';
-import { checkConfig, isUnboundRunning, getUnboundStats } from './unboundControl.js';
+import { checkConfigWithDetails, isUnboundRunning, getUnboundStats } from './unboundControl.js';
 import { loadUpstreamConfig, type DotProvider } from '../config/index.js';
 
 // ============================================================================
@@ -131,26 +131,56 @@ export async function runQuickTest(): Promise<boolean> {
 
 /**
  * Validate Unbound configuration with unbound-checkconf
+ * Now returns detailed stdout/stderr for UI display
  */
 export async function testConfigValidation(): Promise<TestStep> {
   const startTime = Date.now();
 
   try {
-    const valid = await checkConfig();
+    const result = await checkConfigWithDetails();
+    
+    // Build detailed diagnostics
+    const details: Record<string, unknown> = {
+      method: 'unbound-checkconf',
+      valid: result.valid,
+      configPath: result.configPath,
+      checkDurationMs: result.durationMs,
+    };
+    
+    // Include error output if validation failed
+    if (!result.valid) {
+      details.stderr = result.stderr;
+      details.stdout = result.stdout;
+      details.diagnostics = {
+        executedCommand: 'unbound-checkconf',
+        checkedPath: result.configPath,
+        errorText: result.stderr || result.error || 'Unknown config error',
+        recommendedFix: 'Check the config file for syntax errors. Run "unbound-checkconf" manually for full output.',
+      };
+    }
+    
     return {
       name: 'config_validation',
-      status: valid ? 'pass' : 'fail',
-      details: { method: 'unbound-checkconf', valid },
+      status: result.valid ? 'pass' : 'fail',
+      details,
       durationMs: Date.now() - startTime,
-      error: valid ? undefined : 'Configuration syntax errors detected',
+      error: result.valid ? undefined : (result.stderr || result.error || 'Configuration syntax errors detected'),
     };
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     return {
       name: 'config_validation',
       status: 'fail',
-      details: { method: 'unbound-checkconf' },
+      details: {
+        method: 'unbound-checkconf',
+        diagnostics: {
+          executedCommand: 'unbound-checkconf',
+          errorText: errorMsg,
+          recommendedFix: 'Ensure unbound-checkconf is installed and accessible. Check permissions.',
+        },
+      },
       durationMs: Date.now() - startTime,
-      error: err instanceof Error ? err.message : String(err),
+      error: errorMsg,
     };
   }
 }
@@ -482,12 +512,30 @@ export async function testObservationWindow(): Promise<TestStep> {
       error,
     };
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    
+    // Determine likely cause and provide actionable recommendation
+    let recommendedFix = 'Check that unbound-control is accessible and stats are available.';
+    if (errorMsg.includes('permission') || errorMsg.includes('Permission')) {
+      recommendedFix = 'Check permissions: run "sudo -u pusula unbound-control stats_noreset" to verify access.';
+    } else if (errorMsg.includes('SSL') || errorMsg.includes('certificate') || errorMsg.includes('control-key')) {
+      recommendedFix = 'unbound-control certs issue: run "sudo unbound-control-setup" and restart unbound.';
+    } else if (errorMsg.includes('connect') || errorMsg.includes('Connection refused')) {
+      recommendedFix = 'Check that remote-control is enabled in unbound.conf (control-enable: yes).';
+    }
+    
+    details.diagnostics = {
+      executedMethod: 'unbound-control stats_noreset',
+      errorText: errorMsg.slice(0, 500),
+      recommendedFix,
+    };
+    
     return {
       name: 'observation_window',
       status: 'warn', // Warn instead of fail - observation is optional
       details,
       durationMs: Date.now() - startTime,
-      error: `Could not complete observation: ${err instanceof Error ? err.message : String(err)}`,
+      error: `Could not get Unbound statistics: ${errorMsg}`,
     };
   }
 }

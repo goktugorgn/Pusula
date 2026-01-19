@@ -32,6 +32,29 @@ export interface UnboundStats {
 }
 
 /**
+ * Detailed config validation result
+ */
+export interface ConfigCheckResult {
+  valid: boolean;
+  configPath: string;
+  stdout: string;
+  stderr: string;
+  error?: string;
+  durationMs: number;
+}
+
+/**
+ * Unbound connection status
+ */
+export interface UnboundConnection {
+  connected: boolean;
+  method: 'unbound-control';
+  lastSuccessAt?: string;
+  lastError?: string;
+  version?: string;
+}
+
+/**
  * Check if Unbound service is active
  */
 export async function isUnboundRunning(): Promise<boolean> {
@@ -215,18 +238,100 @@ export async function flushRequest(hostname: string): Promise<void> {
 }
 
 /**
- * Validate Unbound configuration
+ * Validate Unbound configuration (simple boolean return for backward compat)
  */
 export async function checkConfig(filePath?: string): Promise<boolean> {
+  const result = await checkConfigWithDetails(filePath);
+  return result.valid;
+}
+
+/**
+ * Validate Unbound configuration with detailed results
+ * Returns stdout/stderr for UI display
+ */
+export async function checkConfigWithDetails(filePath?: string): Promise<ConfigCheckResult> {
+  const startTime = Date.now();
+  const configPath = filePath || '/etc/unbound/unbound.conf';
+
   try {
+    let result;
     if (filePath) {
-      await safeExec('unbound-checkconf-file', { FILE: filePath });
+      result = await safeExec('unbound-checkconf-file', { FILE: filePath });
     } else {
-      await safeExec('unbound-checkconf');
+      result = await safeExec('unbound-checkconf');
     }
-    return true;
-  } catch {
-    return false;
+
+    return {
+      valid: result.code === 0,
+      configPath,
+      stdout: result.stdout.slice(0, 1000),
+      stderr: result.stderr.slice(0, 1000),
+      durationMs: Date.now() - startTime,
+    };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    // Try to extract stderr from CommandError if available
+    const stderrMatch = errorMsg.match(/stderr:\s*(.+)/i);
+    
+    return {
+      valid: false,
+      configPath,
+      stdout: '',
+      stderr: stderrMatch ? stderrMatch[1].slice(0, 1000) : errorMsg.slice(0, 1000),
+      error: errorMsg.slice(0, 500),
+      durationMs: Date.now() - startTime,
+    };
+  }
+}
+
+// Track last successful connection for status reporting
+let lastSuccessAt: string | undefined;
+let lastError: string | undefined;
+let lastVersion: string | undefined;
+
+/**
+ * Get Unbound connection status
+ * Reports connectivity health for UI status indicators
+ */
+export async function getUnboundConnection(): Promise<UnboundConnection> {
+  try {
+    const running = await isUnboundRunning();
+    
+    if (!running) {
+      lastError = 'Unbound service is not running';
+      return {
+        connected: false,
+        method: 'unbound-control',
+        lastSuccessAt,
+        lastError,
+        version: lastVersion,
+      };
+    }
+
+    // Try to get status to verify unbound-control works
+    const status = await getUnboundStatus();
+    
+    // Success - update tracking
+    lastSuccessAt = new Date().toISOString();
+    lastError = undefined;
+    lastVersion = status.version !== 'unknown' ? status.version : lastVersion;
+
+    return {
+      connected: true,
+      method: 'unbound-control',
+      lastSuccessAt,
+      version: status.version,
+    };
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
+    
+    return {
+      connected: false,
+      method: 'unbound-control',
+      lastSuccessAt,
+      lastError,
+      version: lastVersion,
+    };
   }
 }
 
@@ -240,4 +345,7 @@ export default {
   flushZone,
   flushRequest,
   checkConfig,
+  checkConfigWithDetails,
+  getUnboundConnection,
 };
+
